@@ -1,0 +1,7 @@
+requests
+fastapi
+pydantic
+python-dotenv
+uvicorn
+PyMySQL
+PyJWT
