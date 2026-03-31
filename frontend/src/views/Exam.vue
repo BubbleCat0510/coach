@@ -67,7 +67,7 @@
 							<div class="card-content">
 								<div class="card-header">
 									<div class="card-icon">🎯</div>
-									<div class="card-badge">推荐</div>
+									<div class="card-badge recommended">推荐</div>
 								</div>
 								<div class="card-body">
 									<h3 class="card-title">专项能力测试</h3>
@@ -1041,43 +1041,59 @@ const batchSubmitAnswers = async () => {
 	try {
 		batchSubmitting.value = true
 		// 1. 构造 submitExamAnswer 要求的参数结构
-    // console.log("currentExam.questions: ", currentExam.questions)
+		// console.log("currentExam.questions: ", currentExam.questions)
 		const submitData = {
-		  session_id: currentExam.session_id,
-		  round_answers: Object.keys(answerCache.value).map(index => {
-        const q = currentExam.questions[Number(index)]
-
-        return {
-          round_no: Number(index) + 1,
-          ai_question: q.question,
-          answer_analysis: q.explanation || '',
-          scenario: q.scenario || '',
-          ai_reply: Array.isArray(q.correctAnswer)
-            ? JSON.stringify(q.correctAnswer)
-            : (q.correctAnswer ?? ''),
-          answer: answerCache.value[index],
-          dimension: Array.isArray(currentExam.dimensions)
-            ? currentExam.dimensions.join(',')
-            : currentExam.dimensions || '未知维度',
-          round_score: calculateQuestionScore(q, answerCache.value[index])
-        }
-      })
+	  session_id: currentExam.session_id,
+	  round_answers: Object.keys(answerCache.value).map(index => {
+	    const q = currentExam.questions[Number(index)]
+    
+    // 检查q是否存在
+    if (!q) {
+      return {
+        round_no: Number(index) + 1,
+        ai_question: '',
+        answer_analysis: '',
+        scenario: '',
+        ai_reply: '',
+        answer: answerCache.value[index],
+        dimension: Array.isArray(currentExam.dimensions)
+          ? currentExam.dimensions.join(',')
+          : currentExam.dimensions || '未知维度',
+        round_score: 0
       }
-      // console.log('批量提交答案数据:', submitData)
-      // 2. 直接调用原有 submitExamAnswer 函数
-      const res = await submitExamAnswer(submitData) 
-      if (res.success) {
-        ElMessage.success('批量提交答案成功！')
-        examAnswers.value = Object.values(answerCache.value)
-        calculateTotalScore() // 重新计算总分
-      }
-      await submitExam() // 提交整卷结果
-    } catch (error) {
-        console.error('批量提交答案失败:', error)
-        ElMessage.error('批量提交答案失败，请重试！')
-    } finally {
-        batchSubmitting.value = false
     }
+
+	    return {
+	      round_no: Number(index) + 1,
+	      ai_question: q.question || '',
+	      answer_analysis: q.explanation || '',
+	      scenario: q.scenario || '',
+	      ai_reply: Array.isArray(q.correctAnswer)
+	        ? JSON.stringify(q.correctAnswer)
+	        : (q.correctAnswer ?? ''),
+	      answer: answerCache.value[index],
+	      dimension: Array.isArray(currentExam.dimensions)
+	        ? currentExam.dimensions.join(',')
+	        : currentExam.dimensions || '未知维度',
+	      round_score: calculateQuestionScore(q, answerCache.value[index])
+	    }
+	  })
+	  }
+	  // console.log('批量提交答案数据:', submitData)
+	  // 2. 直接调用原有 submitExamAnswer 函数
+	  const res = await submitExamAnswer(submitData) 
+	  if (res.success) {
+	    ElMessage.success('批量提交答案成功！')
+	    examAnswers.value = Object.values(answerCache.value)
+	    calculateTotalScore() // 重新计算总分
+	  }
+	  await submitExam() // 提交整卷结果
+	} catch (error) {
+		console.error('批量提交答案失败:', error)
+		ElMessage.error('批量提交答案失败，请重试！')
+	} finally {
+		batchSubmitting.value = false
+	}
 }
 
 // 4️⃣ 结束与评分（调用后端接口）
@@ -2065,11 +2081,14 @@ const backToDashboard = () => {
 .ability-header {
   display: flex;
   align-items: center;
+  padding-left: 24px;
   justify-content: space-between;
   margin-bottom: 16px;
+  margin-top: 16px;
 }
 
 .ability-name {
+  width: 90px;
   font-weight: 600;
   color: #2c3e50;
 }
@@ -2650,7 +2669,7 @@ const backToDashboard = () => {
 }
 
 .question-number {
-  color: #909399;
+  color: #fff;
   font-size: 14px;
 }
 
@@ -2941,12 +2960,13 @@ const backToDashboard = () => {
 }
 
 .ability-bar {
-  width: 120px;
+  width: 80%;
   height: 8px;
   background: #ebeef5;
   border-radius: 4px;
   overflow: hidden;
   margin-left: 16px;
+  margin-right: 40px;
 }
 
 .ability-fill {

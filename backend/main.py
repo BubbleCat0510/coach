@@ -64,7 +64,7 @@ def login(req: LoginReq):
 
     # 3️⃣ 登录成功，生成 token
     token = create_token({
-        "user_id": user["id"],      # ⭐ 非常重要
+        "user_id": user["id"],
         "username": user["username"]
     })
 

@@ -3,7 +3,8 @@
   <div class="dashboard-page">
     <!-- 顶部标题栏 -->
     <div class="header">
-      <h2>AI 冠军教练 · 员工工作台</h2>
+      <!-- 左侧标题 -->
+      <div class="title"><h2>AI 冠军教练 · 员工工作台</h2></div>
 
       <!-- 右侧用户信息 -->
       <div class="user-info">
@@ -15,6 +16,11 @@
     <!-- 主体内容区域 -->
     <div class="content">
       <!-- 功能卡片 -->
+       <el-card class="card">
+        <h3>📚 学习中心</h3>
+        <p>浏览学习资料，提升专业知识储备</p>
+      </el-card>
+
       <el-card class="card" @click="goTrain">
         <h3>🎯 开始训练</h3>
         <p>进入 AI 冠军教练训练模式</p>
@@ -90,6 +96,8 @@ const goExam = () => {
   position: sticky;
   top: 0;
   z-index: 100;
+  min-width: 900px;
+  white-space: nowrap;
 }
 
 .header h2 {
@@ -97,6 +105,11 @@ const goExam = () => {
   font-weight: 700;
   margin: 0;
   letter-spacing: 1px;
+}
+.title {
+  display: flex;
+  width: 350px;
+  height: 40px;
 }
 
 .user-info {

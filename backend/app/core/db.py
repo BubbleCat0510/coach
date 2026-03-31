@@ -3,6 +3,10 @@ import os
 import pymysql
 import logging
 from contextlib import contextmanager
+from dotenv import load_dotenv
+
+# 加载.env文件
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
