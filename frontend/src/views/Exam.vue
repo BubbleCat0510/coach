@@ -861,7 +861,6 @@ const startExam = async (mode) => {
 		selectedAnswer.value = ''
 		selectedAnswers.value = []
 		caseAnswer.value = ''
-		examStarted.value = true
 		examCompleted.value = false
 		showHistory.value = false
 
@@ -882,7 +881,7 @@ const startExam = async (mode) => {
 					question_index: j + 1 // 传递题目序号，便于AI生成差异化题目
 				})
 
-        // console.log(`生成题目 ${i + 1}-${j + 1} (${qtype}):`, aiRes)
+		        // console.log(`生成题目 ${i + 1}-${j + 1} (${qtype}):`, aiRes)
 				
 				// 标准化题目结构
 				let questionObj = {}
@@ -914,6 +913,9 @@ const startExam = async (mode) => {
 				examAnswers.value.push(null)
 			}
 		}
+
+		// 题目生成成功后才开始测试
+		examStarted.value = true
 		ElMessage.success('测试开始！')
 	} catch (error) {
 		console.error('开始测试失败:', error)

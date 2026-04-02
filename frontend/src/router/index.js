@@ -6,6 +6,7 @@ import Login from '../views/Login.vue'
 import Dashboard from '../views/Dashboard.vue'
 import Train from '../views/Train.vue'
 import Exam from '../views/Exam.vue'
+import TrainingContent from '../views/TrainingContent.vue'
 
 // 定义路由规则
 const routes = [
@@ -37,6 +38,12 @@ const routes = [
     path: '/ai-test',
     name: 'Exam',
     component: Exam
+  },
+  // 培训内容页面
+  {
+    path: '/training',
+    name: 'TrainingContent',
+    component: TrainingContent
   }
 ]
 

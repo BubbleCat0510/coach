@@ -16,7 +16,7 @@
     <!-- 主体内容区域 -->
     <div class="content">
       <!-- 功能卡片 -->
-       <el-card class="card">
+       <el-card class="card" @click="goTraining">
         <h3>📚 学习中心</h3>
         <p>浏览学习资料，提升专业知识储备</p>
       </el-card>
@@ -74,6 +74,11 @@ const goTrain = () => {
 // 跳转AI测试页面
 const goExam = () => {
   router.push('./ai-test')
+}
+
+// 跳转培训内容页面
+const goTraining = () => {
+  router.push('./training')
 }
 </script>
 
