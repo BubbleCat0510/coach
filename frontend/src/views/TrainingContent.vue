@@ -19,10 +19,10 @@
       <!-- 返回首页按钮 -->
       <div class="back-home">
         <el-button
-          text
-          @click="backToDashboard"
-          class="back-btn"
-        >
+                  link
+                  @click="backToDashboard"
+                  class="back-btn"
+                >
           <el-icon><House /></el-icon>
           <span v-if="!sidebarCollapsed">返回首页</span>
         </el-button>
@@ -58,11 +58,11 @@
       <div class="content-header">
         <div class="header-left">
           <el-button
-            text
-            class="sidebar-toggle-btn"
-            @click="toggleSidebar"
-            :title="sidebarCollapsed ? '展开菜单' : '收起菜单'"
-          >
+                  link
+                  class="sidebar-toggle-btn"
+                  @click="toggleSidebar"
+                  :title="sidebarCollapsed ? '展开菜单' : '收起菜单'"
+                >
             <el-icon v-if="sidebarCollapsed"><ArrowLeft /></el-icon>
             <el-icon v-else><ArrowRight /></el-icon>
           </el-button>
@@ -80,31 +80,31 @@
           <!-- 缩放控制 -->
           <div class="zoom-controls">
             <el-button
-              text
-              @click="zoomOut"
-              :disabled="zoomLevel <= 50"
-              size="small"
-            >
+                      link
+                      @click="zoomOut"
+                      :disabled="zoomLevel <= 50"
+                      size="small"
+                    >
               <el-icon><Minus /></el-icon>
             </el-button>
             <span class="zoom-level">{{ zoomLevel }}%</span>
             <el-button
-              text
-              @click="zoomIn"
-              :disabled="zoomLevel >= 200"
-              size="small"
-            >
+                      link
+                      @click="zoomIn"
+                      :disabled="zoomLevel >= 200"
+                      size="small"
+                    >
               <el-icon><Plus /></el-icon>
             </el-button>
           </div>
 
           <!-- 收藏按钮 -->
           <el-button
-            :type="isFavorited ? 'primary' : 'default'"
-            text
-            size="small"
-            @click="toggleFavorite"
-          >
+                    :type="isFavorited ? 'primary' : 'default'"
+                    link
+                    size="small"
+                    @click="toggleFavorite"
+                  >
             <el-icon v-if="isFavorited"><StarFilled /></el-icon>
             <el-icon v-else><Star /></el-icon>
             <span v-if="!sidebarCollapsed">收藏</span>
@@ -180,7 +180,7 @@
       <!-- 底部导航 -->
       <div class="content-footer">
         <el-button
-          text
+          link
           @click="previousContent"
           :disabled="!hasPrevious"
         >
@@ -196,7 +196,7 @@
           />
         </div>
         <el-button
-          text
+          link
           @click="nextContent"
           :disabled="!hasNext"
         >

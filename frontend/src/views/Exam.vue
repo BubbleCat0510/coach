@@ -1,5 +1,20 @@
 <template>
 	<div class="exam-container">
+		<!-- 加载状态 -->
+		<div v-if="loading" class="loading-overlay">
+			<div class="loading-content">
+				<div class="loading-icon">🎯</div>
+				<h2 class="loading-title">正在准备测试</h2>
+				<p class="loading-message">{{ loadingMessage }}</p>
+				<div class="loading-progress">
+					<div class="progress-bar">
+						<div class="progress-fill" :style="{ width: loadingProgress + '%' }"></div>
+					</div>
+					<span class="progress-text">{{ loadingProgress }}%</span>
+				</div>
+			</div>
+		</div>
+
 		<!-- ========== 顶部导航 ========== -->
 		<header class="exam-header">
 			<div class="header-background">
@@ -596,6 +611,9 @@ const submitting = ref(false)
 const batchSubmitting = ref(false) // 新增：批量提交加载状态
 const answerCache = ref({}) // 新增：本地缓存所有题目答案（key: 题目索引，value: 答案）
 const currentScore = ref(0)	// 当前得分
+const loading = ref(false) // 新增：加载状态
+const loadingProgress = ref(0) // 新增：加载进度
+const loadingMessage = ref('') // 新增：加载提示信息
 
 const currentExam = reactive({
 	session_id: null,
@@ -844,10 +862,15 @@ const selectExamMode = async (mode) => {
 
 const startExam = async (mode) => {
 	try {
-		submitting.value = true
+		// 显示加载状态
+		loading.value = true
+		loadingProgress.value = 0
+		loadingMessage.value = '准备测试环境...'
+		
 		// 获取岗位
 		const userRoleRes = await getUserRole()
 		const role = userRoleRes.role
+		
 		// 调用后端创建考试会话
 		const res = await apiStartExam(mode)
 		currentExam.session_id = res.session_id
@@ -864,62 +887,84 @@ const startExam = async (mode) => {
 		examCompleted.value = false
 		showHistory.value = false
 
-		// 2️⃣ 题目生成方式：每题调用AI接口生成
 		// 根据分值配置生成对应数量的题目
 		let questionsToGenerate = SCORE_CONFIG.modeQuestions[mode] || []
+		
+		// 计算总题目数量
+		const totalQuestions = questionsToGenerate.reduce((total, config) => total + config.count, 0)
+		let generatedQuestions = 0
 
-		// 逐题生成
+		// 并行生成题目
+		loadingMessage.value = '生成题目中...'
+		const questionPromises = []
+		
 		for (let i = 0; i < questionsToGenerate.length; i++) {
 			const { qtype, count } = questionsToGenerate[i]
 			
-			// 根据数量生成题目
 			for (let j = 0; j < count; j++) {
-				// AI接口生成题目
-				const aiRes = await chatWithCoachQuestion({
+				// 创建题目生成Promise
+				const questionPromise = chatWithCoachQuestion({
 					role,
 					qtype,
 					question_index: j + 1 // 传递题目序号，便于AI生成差异化题目
+				}).then(aiRes => {
+					// 标准化题目结构
+					let questionObj = {}
+					if (qtype === 'single' || qtype === 'multiple') {
+						questionObj = {
+							type: aiRes.type,
+							question: aiRes.question,
+							options: aiRes.options,
+							correctAnswer: aiRes.correctAnswer,
+							explanation: aiRes.explanation || ''
+						}
+					} else if (qtype === 'truefalse') {
+						questionObj = {
+							type: aiRes.type,
+							question: aiRes.question,
+							correctAnswer: aiRes.correctAnswer,
+							explanation: aiRes.explanation || ''
+						}
+					} else if (qtype === 'case') {
+						questionObj = {
+							type: aiRes.type,
+							question: aiRes.question,
+							scenario: aiRes.scenario || '',
+							correctAnswer: aiRes.correctAnswer || '',
+							explanation: aiRes.explanation || ''
+						}
+					}
+					
+					// 更新进度
+					generatedQuestions++
+					loadingProgress.value = Math.round((generatedQuestions / totalQuestions) * 100)
+					
+					return questionObj
 				})
-
-		        // console.log(`生成题目 ${i + 1}-${j + 1} (${qtype}):`, aiRes)
 				
-				// 标准化题目结构
-				let questionObj = {}
-				if (qtype === 'single' || qtype === 'multiple') {
-					questionObj = {
-						type: aiRes.type,
-						question: aiRes.question,
-						options: aiRes.options,
-						correctAnswer: aiRes.correctAnswer,
-						explanation: aiRes.explanation || ''
-					}
-				} else if (qtype === 'truefalse') {
-					questionObj = {
-						type: aiRes.type,
-						question: aiRes.question,
-						correctAnswer: aiRes.correctAnswer,
-						explanation: aiRes.explanation || ''
-					}
-				} else if (qtype === 'case') {
-					questionObj = {
-						type: aiRes.type,
-						question: aiRes.question,
-						scenario: aiRes.scenario || '',
-						correctAnswer: aiRes.correctAnswer || '',
-						explanation: aiRes.explanation || ''
-					}
-				}
-				currentExam.questions.push(questionObj)
-				examAnswers.value.push(null)
+				questionPromises.push(questionPromise)
 			}
 		}
 
+		// 等待所有题目生成完成
+		const questions = await Promise.all(questionPromises)
+		currentExam.questions = questions
+		examAnswers.value = new Array(questions.length).fill(null)
+
 		// 题目生成成功后才开始测试
+		loadingMessage.value = '准备就绪...'
+		loadingProgress.value = 100
+		
+		// 短暂延迟确保用户看到完成状态
+		await new Promise(resolve => setTimeout(resolve, 500))
+		
+		loading.value = false
 		examStarted.value = true
 		ElMessage.success('测试开始！')
 	} catch (error) {
 		console.error('开始测试失败:', error)
 		ElMessage.error('开始测试失败，请重试')
+		loading.value = false
 	} finally {
 		submitting.value = false
 	}
@@ -1271,6 +1316,88 @@ const backToDashboard = () => {
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   font-family: 'PingFang SC', 'Helvetica Neue', STHeiti, 'Microsoft Yahei', sans-serif;
+}
+
+/* 加载状态 */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-content {
+  text-align: center;
+  color: white;
+  max-width: 400px;
+  padding: 40px;
+  background: rgba(150, 102, 199, 0.3);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.loading-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  animation: pulse 2s infinite;
+}
+
+.loading-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.loading-message {
+  font-size: 16px;
+  margin-bottom: 30px;
+  opacity: 0.9;
+}
+
+.loading-progress {
+  margin-top: 20px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* ========== 顶部导航 ========== */

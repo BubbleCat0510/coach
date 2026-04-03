@@ -33,6 +33,7 @@ app.add_middleware(
 class LoginReq(BaseModel):
     username: str
     password: str
+    role: str = "employee"
 
 @app.post("/login")
 def login(req: LoginReq):
@@ -40,7 +41,7 @@ def login(req: LoginReq):
         with conn.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, username, password
+                SELECT id, username, password, role
                 FROM coach_user
                 WHERE username = %s
                 """,
@@ -62,15 +63,28 @@ def login(req: LoginReq):
             "message": "账号或密码错误"
         }
 
-    # 3️⃣ 登录成功，生成 token
+    # 3️⃣ 角色验证
+    print("User data:", user)
+    user_role = user.get("role", "employee")
+    print("User role:", user_role)
+    if req.role == "admin" and user_role != "管理员":
+        # 用户选择管理员角色但数据库中不是管理员
+        return {
+            "success": False,
+            "message": "权限不足，无法以管理员身份登录"
+        }
+
+    # 4️⃣ 登录成功，生成 token
     token = create_token({
         "user_id": user["id"],
-        "username": user["username"]
+        "username": user["username"],
+        "role": user_role
     })
 
     return {
         "success": True,
-        "token": token
+        "token": token,
+        "role": user_role
     }
 
 # uvicorn main:app --host 0.0.0.0 --port 8001

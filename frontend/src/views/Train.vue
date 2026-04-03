@@ -5,7 +5,7 @@
       <div class="sidebar-header">
         <h2>🎯 AI 教练训练</h2>
         <el-button
-          text
+          link
           class="collapse-btn"
           @click="toggleSidebar"
         >
@@ -44,7 +44,7 @@
       <!-- 更多历史按钮 -->
       <div v-if="allSessions.length > 10" class="more-history">
         <el-button
-          text
+          link
           type="primary"
           @click="showHistoryDialog = true"
         >
@@ -59,7 +59,7 @@
       <div class="fixed-header">
         <el-button
           v-if="!sidebarVisible"
-          text
+          link
           class="collapse-btn"
           @click="toggleSidebar"
         >
@@ -88,7 +88,7 @@
 
         <div class="header-actions">
           <el-button
-            text
+            link
             @click="refreshData"
             :loading="isRefreshing"
             title="刷新数据"
@@ -117,12 +117,15 @@
         <div v-if="questionLoading" class="chat-item ai">
           <div class="bubble loading-bubble">
             <el-icon class="is-loading"><Loading /></el-icon>
-            <el-skeleton :loading="true" animated>
-              <template #template>
-                <el-skeleton-item variant="text" style="width: 200px;" />
-                <el-skeleton-item variant="text" style="width: 150px;" />
-              </template>
-            </el-skeleton>
+            <div class="loading-content">
+              <p class="loading-text">题目生成中，请稍候...</p>
+              <el-skeleton :loading="true" animated>
+                <template #template>
+                  <el-skeleton-item variant="text" style="width: 200px;" />
+                  <el-skeleton-item variant="text" style="width: 150px;" />
+                </template>
+              </el-skeleton>
+            </div>
           </div>
         </div>
 
@@ -693,6 +696,7 @@ const send = async () => {
 
   // 请求 AI 生成下一轮提问（优先使用后端/模型生成的问题）
   let nextQuestion = '请继续补充你对商圈成熟度的判断。'
+  questionLoading.value = true
   try {
     const nqRes = await chatWithCoachQuestion({
       role: roleName.value,
@@ -704,6 +708,8 @@ const send = async () => {
     nextQuestion = nqRes.nextQuestion || nqRes.next_question || nqRes.reply || nextQuestion
   } catch (e) {
     console.error('获取下一轮提问失败', e)
+  } finally {
+    questionLoading.value = false
   }
 
   rounds.value.push({
@@ -757,11 +763,14 @@ const createNewSession = async () => {
 
     // 4️⃣ 生成开场问题（由 AI 随机生成开场句），若失败则使用默认
     let opening = '你好，我是你的 AI 冠军教练，请开始你的训练。'
+    questionLoading.value = true
     try {
       const oq = await chatWithCoachQuestion({ role: roleName.value, last_question: '', type: 'opening', session_id: newSession.id })
       opening = oq.nextQuestion || oq.next_question || oq.reply || opening
     } catch (e) {
       console.error('获取开场问题失败', e)
+    } finally {
+      questionLoading.value = false
     }
 
     // 5️⃣ 重置右侧聊天内容（开始新训练）
@@ -789,6 +798,7 @@ const switchSession = async (session) => {
   roundsLoading.value = false
 
   // 先前端模拟
+  questionLoading.value = true
   try {
     // 1️⃣ 调用后端接口，获取历史训练轮次
     const res = await getSessionRounds(session.id)
@@ -845,6 +855,8 @@ const switchSession = async (session) => {
     if (chatBox.value) {
       try { chatBox.value.scrollTop = chatBox.value.scrollHeight } catch (e) {}
     }
+  } finally {
+    questionLoading.value = false
   }
 
   // 恢复当前会话的草稿
@@ -1127,9 +1139,39 @@ const backToDashboard = () => {
   font-style: italic;
   opacity: 1;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  padding: 16px 20px;
+}
+
+.loading-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loading-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #065f46;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-bubble .el-icon {
+  font-size: 20px;
+  color: #34d399;
+  margin-top: 2px;
+  animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .error-bubble {

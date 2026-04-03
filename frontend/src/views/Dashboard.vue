@@ -9,7 +9,7 @@
       <!-- 右侧用户信息 -->
       <div class="user-info">
         <span>欢迎你，{{ username }}</span>
-        <el-button type="text" @click="logout">退出登录</el-button>
+        <el-button link @click="logout">退出登录</el-button>
       </div>
     </div>
 
@@ -27,8 +27,8 @@
       </el-card>
 
       <el-card class="card" @click="goExam">
-        <h3>🧪 AI 测试中心</h3>
-        <p>测试 AI 教练的各项能力指标</p>
+        <h3>🧪 评估中心</h3>
+        <p>AI评估的各项能力指标</p>
       </el-card>
 
       <el-card class="card">

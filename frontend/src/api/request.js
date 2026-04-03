@@ -3,7 +3,7 @@ import axios from 'axios'
 // 创建 axios 实例
 const request = axios.create({
   baseURL: 'http://localhost:8001', // FastAPI 地址
-  timeout: 10000                   // 超时时间
+  timeout: 60000                   // 超时时间
 })
 
 // 请求拦截器（每次请求前）
