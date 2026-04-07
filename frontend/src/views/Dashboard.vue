@@ -31,11 +31,46 @@
         <p>AI评估的各项能力指标</p>
       </el-card>
 
-      <el-card class="card">
-        <h3>📊 我的成绩</h3>
-        <p>查看历史训练评分与进步曲线</p>
+      <el-card class="card" @click="goProfile">
+        <h3><el-icon><UserFilled /></el-icon> 个人中心</h3>
+        <p>查看个人信息与历史记录</p>
       </el-card>
     </div>
+
+    <!-- 角色选择弹窗 -->
+    <el-dialog
+      v-model="showRoleDialog"
+      title="选择角色"
+      width="400px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      custom-class="role-select-dialog"
+    >
+      <div class="role-select-content">
+        <div class="role-select-header">
+          <el-icon class="header-icon"><UserFilled /></el-icon>
+          <h3>请选择您的角色</h3>
+          <p class="role-select-desc">选择一个角色以开始使用系统</p>
+        </div>
+        <el-form :model="roleForm" ref="roleFormRef" label-width="0">
+          <el-form-item prop="role" class="role-select-item">
+            <el-select v-model="roleForm.role" placeholder="请选择角色" style="width: 150px;" size="large" :popper-width="300">
+              <el-option label="商铺开发" value="商铺开发" />
+              <el-option label="品牌开发" value="品牌开发" />
+              <el-option label="品牌选址" value="品牌选址" />
+              <el-option label="上门服务" value="上门服务" />
+              <el-option label="商铺招商" value="商铺招商" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button type="primary" size="large" @click="saveRole" class="save-role-btn">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -43,21 +78,69 @@
 // Vue 组合式 API
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getNickname } from '../api/user'
+import { getNickname, getUserRole, updateRole } from '../api/user'
+import { ElMessage } from 'element-plus'
+import { UserFilled } from '@element-plus/icons-vue'
 
 // 路由实例
 const router = useRouter()
 
 // 当前登录用户名
 const username = ref('')
+// 角色选择弹窗
+const showRoleDialog = ref(false)
+// 角色表单
+const roleForm = ref({ role: '' })
+const roleFormRef = ref(null)
 
 // 异步逻辑必须放在 onMounted 等 async 函数内，用 ref 响应式变量存用户名；
 // 页面加载时获取用户信息
 onMounted(async () => {
-  const res = await getNickname()
-  username.value = res.nickname // 把接口返回值赋值给响应式变量
+  try {
+    // 获取用户昵称
+    const nicknameRes = await getNickname()
+    username.value = nicknameRes.nickname // 把接口返回值赋值给响应式变量
+    
+    // 获取用户角色
+    const roleRes = await getUserRole()
+    const userRole = roleRes.role
+    
+    // 控制台输出角色数据
+    console.log('用户角色数据:', roleRes)
+    console.log('用户角色:', userRole)
+    
+    // 如果角色为空、空字符串或null，显示角色选择弹窗
+    if (!userRole || (typeof userRole === 'string' && userRole.trim() === '')) {
+      showRoleDialog.value = true
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    ElMessage.error('获取用户信息失败')
+  }
 })
 
+// 保存角色
+const saveRole = async () => {
+  if (!roleForm.value.role) {
+    ElMessage.warning('请选择角色')
+    return
+  }
+  
+  try {
+    // 调用API保存角色
+    await updateRole(roleForm.value.role)
+    
+    ElMessage.success('角色选择成功')
+    showRoleDialog.value = false
+    
+    // 重新获取用户信息
+    const roleRes = await getUserRole()
+    console.log('更新后的角色:', roleRes.role)
+  } catch (error) {
+    console.error('保存角色失败:', error)
+    ElMessage.error('保存角色失败')
+  }
+}
 
 // 退出登录
 const logout = () => {
@@ -79,6 +162,13 @@ const goExam = () => {
 // 跳转培训内容页面
 const goTraining = () => {
   router.push('./training')
+}
+
+// 跳转个人中心页面
+const goProfile = () => {
+  // 这里可以添加个人中心页面的路由跳转
+  // 暂时先弹出提示
+  ElMessage.info('个人中心功能开发中')
 }
 </script>
 
@@ -197,6 +287,15 @@ const goTraining = () => {
   margin: 0 0 12px 0;
   color: #2c3e50;
   transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card h3 .el-icon {
+  font-size: 24px;
+  vertical-align: middle;
+  margin-top: -2px;
 }
 
 .card:hover h3 {
@@ -213,5 +312,90 @@ const goTraining = () => {
 
 .card:hover p {
   color: #5a6c7d;
+}
+/* 角色选择弹窗样式 */
+.role-select-dialog {
+  .el-dialog__header {
+    text-align: center;
+    padding: 20px 20px 10px;
+  }
+  
+  .el-dialog__title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #303133;
+  }
+  
+  .el-dialog__body {
+    padding: 20px;
+  }
+  
+  .el-dialog__footer {
+    padding: 10px 20px 20px;
+    text-align: center;
+  }
+}
+
+.role-select-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.role-select-header {
+  text-align: center;
+  margin-bottom: 24px;
+  width: 100%;
+}
+
+.header-icon {
+  font-size: 48px;
+  color: #409EFF;
+  margin-bottom: 16px;
+}
+
+.role-select-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.role-select-desc {
+  margin: 0;
+  font-size: 14px;
+  color: #909399;
+  line-height: 1.5;
+}
+
+.role-select-item {
+  width: 100%;
+  max-width: 300px;
+  
+  /* 让选择框内的内容居中显示 */
+  :deep(.el-select .el-input__inner) {
+    text-align: center;
+  }
+}
+
+/* 让下拉菜单中的内容居中显示 */
+.el-select-dropdown__item {
+  text-align: center !important;
+}
+
+/* 确保选择框内的内容也居中显示 */
+.el-select .el-input__inner {
+  text-align: center !important;
+}
+
+.save-role-btn {
+  width: 120px;
+  font-size: 16px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 </style>

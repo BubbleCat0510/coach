@@ -14,3 +14,15 @@ export function getProfile() {
 export function getUserRole() {
   return request.get('/user/role')
 }
+
+// 获取用户列表（管理员权限）
+export function getUserList() {
+  return request.get('/user/list')
+}
+
+// 更新用户角色
+export function updateRole(role) {
+  return request.post('/user/update-role', null, {
+    params: { role }
+  })
+}

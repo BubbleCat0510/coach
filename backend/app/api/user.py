@@ -60,11 +60,53 @@ def get_user_role(current_user: dict = Depends(get_current_user)):
             )
             user = cursor.fetchone()
 
-    if user["role"] == "管理员":
-        return {"role": "品牌选址"}
+    # 直接返回数据库中的值，即使是空值
+    return {"role": user.get("role") if user else None}
+
+# 获取用户列表（管理员权限）
+@router.get("/list")
+def get_user_list(current_user: dict = Depends(get_current_user)):
+    # 从数据库查询所有用户
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, username, nickname as name, role, create_time as createdAt 
+                FROM coach_user
+                ORDER BY id ASC
+                """
+            )
+            users = cursor.fetchall()
     
-    if not user or not user.get("role"):
-        # 兜底默认岗位
-        return {"role": "品牌选址"}
+    # 转换为前端需要的格式
+    user_list = []
+    for user in users:
+        user_list.append({
+            "id": user["id"],
+            "username": user["username"],
+            "name": user["name"] or "",
+            "role": user["role"] or "",
+            "createdAt": user["createdAt"].strftime("%Y-%m-%d %H:%M:%S") if user["createdAt"] else ""
+        })
     
-    return {"role": user["role"]}
+    return {"users": user_list}
+
+# 更新用户角色
+@router.post("/update-role")
+def update_user_role(role: str, current_user: dict = Depends(get_current_user)):
+    user_id = current_user.get("user_id")
+    
+    # 更新用户角色
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE coach_user 
+                SET role = %s 
+                WHERE id = %s
+                """,
+                (role, user_id)
+            )
+            conn.commit()
+    
+    return {"success": True, "message": "角色更新成功"}
