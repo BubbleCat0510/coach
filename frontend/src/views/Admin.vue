@@ -88,7 +88,7 @@
           <el-table-column prop="name" label="姓名" />
           <el-table-column prop="role" label="角色">
             <template #default="scope">
-              <el-tag :type="getRoleType(scope.row.role)">
+              <el-tag effect="light" :type="getRoleType(scope.row.role)">
                 {{ scope.row.role || '未设置' }}
               </el-tag>
             </template>
@@ -152,8 +152,12 @@
         </el-form-item>
         <el-form-item label="角&nbsp;&nbsp;&emsp;色" prop="role">
           <el-select style="padding-right: 30px;" v-model="userForm.role" placeholder="请选择角色">
-            <el-option label="管理员" value="admin" />
-            <el-option label="员工" value="employee" />
+            <el-option label="管理员" value="管理员" />
+            <el-option label="商铺开发" value="商铺开发" />
+            <el-option label="品牌开发" value="品牌开发" />
+            <el-option label="品牌选址" value="品牌选址" />
+            <el-option label="上门服务" value="上门服务" />
+            <el-option label="商铺招商" value="商铺招商" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -175,8 +179,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
-import { getUserList } from '@/api/user'
-import { getNickname } from '@/api/user'
+import { getUserList, getNickname, createUser, updateUser, deleteUser as deleteUserApi } from '@/api/user'
 
 const router = useRouter()
 
@@ -190,7 +193,7 @@ const userDialogVisible = ref(false)
 const isEditing = ref(false)
 const userFormRef = ref(null)
 const activeMenu = ref('user')
-const showUserMenu = ref(false)
+const showUserMenu = ref(true)
 const loading = ref(false)
 const userNickname = ref('管理员')
 
@@ -243,14 +246,14 @@ const userForm = reactive({
   username: '',
   name: '',
   password: '',
-  role: 'employee'
+  role: ''
 })
 
 // 表单验证规则
 const userRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  password: [{ required: false, message: '请输入密码', trigger: 'blur' }],
   role: [{ required: true, message: '请选择角色', trigger: 'change' }]
 }
 
@@ -295,7 +298,7 @@ const openAddUserDialog = () => {
     username: '',
     name: '',
     password: '',
-    role: 'employee'
+    role: ''
   })
   userDialogVisible.value = true
 }
@@ -318,37 +321,39 @@ const saveUser = async () => {
   try {
     await userFormRef.value.validate()
     
-    // 这里可以添加保存用户的API调用
-    // 目前暂时使用模拟数据，后续需要替换为真实的API调用
-    
     if (isEditing.value) {
       // 编辑用户
-      const index = users.value.findIndex(u => u.id === userForm.id)
-      if (index !== -1) {
-        users.value[index] = {
-          ...users.value[index],
-          username: userForm.username,
-          name: userForm.name,
-          role: userForm.role
+      const response = await updateUser(userForm)
+      if (response && response.success) {
+        const index = users.value.findIndex(u => u.id === userForm.id)
+        if (index !== -1) {
+          users.value[index] = {
+            ...users.value[index],
+            username: userForm.username,
+            name: userForm.name,
+            role: userForm.role
+          }
         }
         ElMessage.success('用户编辑成功')
+      } else {
+        ElMessage.error('用户编辑失败')
       }
     } else {
       // 添加用户
-      const newUser = {
-        id: users.value.length + 1,
-        username: userForm.username,
-        name: userForm.name,
-        role: userForm.role,
-        createdAt: new Date().toLocaleString()
+      const response = await createUser(userForm)
+      if (response && response.success) {
+        // 重新加载用户列表
+        await loadUsers()
+        ElMessage.success('用户添加成功')
+      } else {
+        ElMessage.error('用户添加失败')
       }
-      users.value.push(newUser)
-      ElMessage.success('用户添加成功')
     }
     
     userDialogVisible.value = false
   } catch (error) {
-    console.error('表单验证失败:', error)
+    console.error('保存用户失败:', error)
+    ElMessage.error('保存用户失败')
   }
 }
 
@@ -361,11 +366,21 @@ const deleteUser = (user) => {
       cancelButtonText: '取消',
       type: 'warning'
     }
-  ).then(() => {
-    const index = users.value.findIndex(u => u.id === user.id)
-    if (index !== -1) {
-      users.value.splice(index, 1)
-      ElMessage.success('用户删除成功')
+  ).then(async () => {
+    try {
+      const response = await deleteUserApi(user.id)
+      if (response && response.success) {
+        const index = users.value.findIndex(u => u.id === user.id)
+        if (index !== -1) {
+          users.value.splice(index, 1)
+        }
+        ElMessage.success('用户删除成功')
+      } else {
+        ElMessage.error('用户删除失败')
+      }
+    } catch (error) {
+      console.error('删除用户失败:', error)
+      ElMessage.error('删除用户失败')
     }
   }).catch(() => {
     // 用户取消删除
@@ -399,8 +414,12 @@ const pageTitle = computed(() => {
 // 获取角色标签类型
 const getRoleType = (role) => {
   if (!role) return 'info'
-  if (role === 'admin') return 'primary'
-  if (role === 'employee') return 'success'
+  if (role === '管理员') return 'info'
+  if (role === '商铺开发') return 'custom'
+  if (role === '品牌开发') return 'warning'
+  if (role === '品牌选址') return 'danger'
+  if (role === '上门服务') return 'primary'
+  if (role === '商铺招商') return 'success'
   return 'warning'
 }
 </script>
@@ -465,6 +484,7 @@ const getRoleType = (role) => {
 }
 
 .menu-item.active {
+
   background-color: #e6f7ee;
   border-left-color: #2e8b57;
   color: #2e8b57;
@@ -728,5 +748,48 @@ const getRoleType = (role) => {
   background-color: #67c23a;
   border-color: #67c23a;
   color: white;
+}
+
+/* 标签样式 */
+:deep(.el-tag--light.el-tag--success) {
+  background-color: #f0f9eb !important;
+  border-color: #e6f7ee !important;
+  color: #67c23a !important;
+}
+
+:deep(.el-tag--light.el-tag--warning) {
+  background-color: #fdf6ec !important;
+  border-color: #faecd8 !important;
+  color: #e6a23c !important;
+}
+
+:deep(.el-tag--light.el-tag--danger) {
+  background-color: #fef0f0 !important;
+  border-color: #fde2e2 !important;
+  color: #f56c6c !important;
+}
+
+:deep(.el-tag--light.el-tag--info) {
+  background-color: #ecf5ff !important;
+  border-color: #ebeef5 !important;
+  color: #909399 !important;
+}
+
+:deep(.el-tag--light.el-tag--primary) {
+  background-color: #ecf5ff !important;
+  border-color: #ebeef5 !important;
+  color: #409eff !important;
+}
+
+:deep(.el-tag--light.el-tag--dark) {
+  background-color: #f4f4f5 !important;
+  border-color: #e9e9eb !important;
+  color: #606266 !important;
+}
+
+:deep(.el-tag--light.el-tag--custom) {
+  background-color: #f0f5ff !important;
+  border-color: #e6efff !important;
+  color: #667cff !important;
 }
 </style>

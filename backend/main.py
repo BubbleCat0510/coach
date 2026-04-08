@@ -57,7 +57,9 @@ def login(req: LoginReq):
         }
 
     # 2️⃣ 密码不匹配
-    if user["password"] != req.password:
+    import hashlib
+    hashed_password = hashlib.md5(req.password.encode()).hexdigest()
+    if user["password"] != hashed_password:
         return {
             "success": False,
             "message": "账号或密码错误"

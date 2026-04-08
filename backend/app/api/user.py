@@ -110,3 +110,94 @@ def update_user_role(role: str, current_user: dict = Depends(get_current_user)):
             conn.commit()
     
     return {"success": True, "message": "角色更新成功"}
+
+# 添加用户
+from pydantic import BaseModel
+
+class UserCreate(BaseModel):
+    username: str
+    name: str
+    password: str
+    role: str
+
+@router.post("/create")
+def create_user(user: UserCreate, current_user: dict = Depends(get_current_user)):
+    import hashlib
+    
+    # 哈希密码
+    hashed_password = hashlib.md5(user.password.encode()).hexdigest()
+    
+    # 插入新用户
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO coach_user (username, password, nickname, role, status)
+                VALUES (%s, %s, %s, %s, 1)
+                """,
+                (user.username, hashed_password, user.name, user.role)
+            )
+            conn.commit()
+    
+    return {"success": True, "message": "用户添加成功"}
+
+class UserUpdate(BaseModel):
+    id: int
+    username: str
+    name: str
+    password: str = None
+    role: str
+
+# 更新用户
+@router.post("/update")
+def update_user(user: UserUpdate, current_user: dict = Depends(get_current_user)):
+    import hashlib
+    
+    # 更新用户信息
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            if user.password:
+                # 哈希密码
+                hashed_password = hashlib.md5(user.password.encode()).hexdigest()
+                # 更新所有字段
+                cursor.execute(
+                    """
+                    UPDATE coach_user 
+                    SET username = %s, password = %s, nickname = %s, role = %s
+                    WHERE id = %s
+                    """,
+                    (user.username, hashed_password, user.name, user.role, user.id)
+                )
+            else:
+                # 不更新密码
+                cursor.execute(
+                    """
+                    UPDATE coach_user 
+                    SET username = %s, nickname = %s, role = %s
+                    WHERE id = %s
+                    """,
+                    (user.username, user.name, user.role, user.id)
+                )
+            conn.commit()
+    
+    return {"success": True, "message": "用户更新成功"}
+
+class UserDelete(BaseModel):
+    id: int
+
+# 删除用户
+@router.post("/delete")
+def delete_user(user: UserDelete, current_user: dict = Depends(get_current_user)):
+    # 删除用户
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM coach_user 
+                WHERE id = %s
+                """,
+                (user.id,)
+            )
+            conn.commit()
+    
+    return {"success": True, "message": "用户删除成功"}

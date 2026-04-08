@@ -72,10 +72,10 @@ router.beforeEach((to, from, next) => {
   }
 
   // 访问其他页面，但没有 token
-  // if (!token) {
-  //   next('/login')
-  //   return
-  // }
+  if (!token) {
+    next('/login')
+    return
+  }
 
   // 有 token，正常放行
   next()

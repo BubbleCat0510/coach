@@ -26,3 +26,18 @@ export function updateRole(role) {
     params: { role }
   })
 }
+
+// 添加用户
+export function createUser(userData) {
+  return request.post('/user/create', userData)
+}
+
+// 更新用户
+export function updateUser(userData) {
+  return request.post('/user/update', userData)
+}
+
+// 删除用户
+export function deleteUser(userId) {
+  return request.post('/user/delete', { id: userId })
+}
