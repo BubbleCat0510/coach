@@ -8,6 +8,7 @@ import Train from '../views/Train.vue'
 import Exam from '../views/Exam.vue'
 import TrainingContent from '../views/TrainingContent.vue'
 import Admin from '../views/Admin.vue'
+import Profile from '../views/Profile.vue'
 
 // 定义路由规则
 const routes = [
@@ -51,6 +52,12 @@ const routes = [
     path: '/admin',
     name: 'Admin',
     component: Admin
+  },
+  // 个人中心页面
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: Profile
   }
 ]
 

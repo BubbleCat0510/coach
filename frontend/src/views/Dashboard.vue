@@ -14,20 +14,30 @@
     </div>
 
     <!-- 主体内容区域 -->
+    <div class="welcome-section">
+      <div class="welcome-text">
+        <h1>欢迎回来，{{ username }}！</h1>
+        <p>今天你想进行什么训练？</p>
+      </div>
+      <div class="date-time">
+        <p class="current-date">{{ currentDate }}</p>
+        <p class="current-time">{{ currentTime }}</p>
+      </div>
+    </div>
     <div class="content">
       <!-- 功能卡片 -->
        <el-card class="card" @click="goTraining">
-        <h3>📚 学习中心</h3>
+        <h3><el-icon><Reading /></el-icon> 学习中心</h3>
         <p>浏览学习资料，提升专业知识储备</p>
       </el-card>
 
       <el-card class="card" @click="goTrain">
-        <h3>🎯 开始训练</h3>
+        <h3><el-icon><Aim /></el-icon> 开始训练</h3>
         <p>进入 AI 冠军教练训练模式</p>
       </el-card>
 
       <el-card class="card" @click="goExam">
-        <h3>🧪 评估中心</h3>
+        <h3><el-icon><Histogram /></el-icon> 评估中心</h3>
         <p>AI评估的各项能力指标</p>
       </el-card>
 
@@ -80,22 +90,66 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getNickname, getUserRole, updateRole } from '../api/user'
 import { ElMessage } from 'element-plus'
-import { UserFilled } from '@element-plus/icons-vue'
+import { UserFilled, Reading, Aim, Star, Histogram } from '@element-plus/icons-vue'
 
 // 路由实例
 const router = useRouter()
 
 // 当前登录用户名
 const username = ref('')
+// 当前日期
+const currentDate = ref('')
+// 当前时间（周几和实时时间）
+const currentTime = ref('')
 // 角色选择弹窗
 const showRoleDialog = ref(false)
 // 角色表单
 const roleForm = ref({ role: '' })
 const roleFormRef = ref(null)
 
+// 更新当前日期时间
+const updateDateTime = () => {
+  const now = new Date()
+  
+  // 日期选项
+  const dateOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }
+  
+  // 时间选项
+  const timeOptions = {
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }
+  
+  // 格式化日期并添加空格
+  let dateStr = now.toLocaleDateString('zh-CN', dateOptions)
+  dateStr = dateStr.replace(/(\d+)(年|月|日)/g, ' $1 $2')
+  currentDate.value = dateStr
+  
+  // 格式化时间并添加空格
+  let timeStr = now.toLocaleDateString('zh-CN', timeOptions)
+  timeStr = timeStr.replace(/(\d+):(\d+):(\d+)/g, ' $1 : $2 : $3 ')
+  currentTime.value = timeStr
+}
+
+// 初始化日期时间并设置定时器
+const initDateTime = () => {
+  updateDateTime()
+  setInterval(updateDateTime, 1000)
+}
+
 // 异步逻辑必须放在 onMounted 等 async 函数内，用 ref 响应式变量存用户名；
 // 页面加载时获取用户信息
 onMounted(async () => {
+  // 初始化日期时间
+  initDateTime()
+  
   try {
     // 获取用户昵称
     const nicknameRes = await getNickname()
@@ -166,28 +220,26 @@ const goTraining = () => {
 
 // 跳转个人中心页面
 const goProfile = () => {
-  // 这里可以添加个人中心页面的路由跳转
-  // 暂时先弹出提示
-  ElMessage.info('个人中心功能开发中')
+  router.push('./profile')
 }
 </script>
 
 <style scoped>
 .dashboard-page {
   min-height: 100vh;
-  background: #e8e8e8;
+  background: #d9f4e6;
 }
 
 /* 顶部栏 */
 .header {
   height: 80px;
-  background: linear-gradient(135deg, #90EE90, #98FB98);
-  color: #2e8b57;
+  background: linear-gradient(135deg, #8DC149, #7ab838);
+  color: white;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 40px;
-  box-shadow: 0 4px 20px rgba(144, 238, 144, 0.3);
+  box-shadow: 0 4px 20px rgba(141, 193, 73, 0.3);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -230,9 +282,92 @@ const goProfile = () => {
   background: rgba(46, 139, 87, 0.1) !important;
 }
 
+/* 欢迎语区域 */
+.welcome-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30px 40px;
+  max-width: 1400px;
+  margin: 30px auto 20px;
+  flex-wrap: wrap;
+  gap: 20px;
+  background: linear-gradient(135deg, #f0f9f4, #e6f7ee);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(141, 193, 73, 0.2);
+  border: 1px solid rgba(141, 193, 73, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.welcome-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(152, 251, 152, 0.1) 0%, rgba(152, 251, 152, 0) 70%);
+  animation: rotate 20s linear infinite;
+}
+
+@keyframes rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 日期时间区域 */
+.date-time {
+  flex: 1;
+  min-width: 300px;
+  text-align: right;
+}
+
+.current-date {
+  font-size: 20px;
+  color: #7f8c8d;
+  margin: 0 0 4px 0;
+  line-height: 1.4;
+  font-family: monospace;
+  font-weight: 500;
+  text-align: right;
+}
+
+.current-time {
+  font-size: 18px;
+  color: #7f8c8d;
+  margin: 0;
+  line-height: 1.4;
+  font-family: monospace;
+  font-weight: 500;
+  text-align: right;
+}
+
+/* 欢迎语文本区域 */
+.welcome-text {
+  flex: 2;
+  text-align: left;
+  min-width: 300px;
+}
+
+.welcome-text h1 {
+  font-size: 36px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin: 0 0 12px 0;
+  letter-spacing: 1px;
+}
+
+.welcome-text p {
+  font-size: 18px;
+  color: #7f8c8d;
+  margin: 0;
+  line-height: 1.6;
+}
+
 /* 内容区域 */
 .content {
-  padding: 50px 40px;
+  padding: 20px 40px 50px;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 30px;
@@ -243,13 +378,13 @@ const goProfile = () => {
 /* 功能卡片 */
 .card {
   width: 100%;
-  min-height: 200px;
+  min-height: 220px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: none !important;
   border-radius: 16px !important;
-  background: white;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(135deg, #f0f9f4, #e6f7ee);
+  box-shadow: 0 4px 16px rgba(141, 193, 73, 0.2);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -257,6 +392,9 @@ const goProfile = () => {
   text-align: center;
   overflow: hidden;
   position: relative;
+  padding: 30px 20px;
+  box-sizing: border-box;
+  border: 1px solid rgba(141, 193, 73, 0.3);
 }
 
 .card::before {
@@ -266,52 +404,84 @@ const goProfile = () => {
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #8DC149, #7ab838);
+  background: linear-gradient(90deg, #98FB98, #7ab838, #98FB98);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.3s ease;
 }
 
+.card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(152, 251, 152, 0.1), rgba(152, 251, 152, 0));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
 .card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 32px rgba(141, 193, 73, 0.2);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 16px 40px rgba(152, 251, 152, 0.3);
 }
 
 .card:hover::before {
   transform: scaleX(1);
 }
 
+.card:hover::after {
+  opacity: 1;
+}
+
 .card h3 {
   font-size: 24px;
   font-weight: 700;
   margin: 0 0 12px 0;
-  color: #2c3e50;
+  color: #228b22;
   transition: color 0.3s ease;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .card h3 .el-icon {
-  font-size: 24px;
+  font-size: 32px;
   vertical-align: middle;
   margin-top: -2px;
+  color: #32cd32;
+  background: rgba(152, 251, 152, 0.2);
+  padding: 12px;
+  border-radius: 50%;
+  margin-right: 12px;
+  transition: all 0.3s ease;
+}
+
+.card:hover h3 .el-icon {
+  background: rgba(152, 251, 152, 0.4);
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 0 4px 12px rgba(152, 251, 152, 0.4);
 }
 
 .card:hover h3 {
-  color: #8DC149;
+  color: #32cd32;
 }
 
 .card p {
   font-size: 14px;
-  color: #7f8c8d;
+  color: #669966;
   margin: 0;
   line-height: 1.6;
   transition: color 0.3s ease;
+  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .card:hover p {
-  color: #5a6c7d;
+  color: #32cd32;
 }
 /* 角色选择弹窗样式 */
 .role-select-dialog {
