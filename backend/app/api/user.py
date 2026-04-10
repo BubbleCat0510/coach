@@ -38,11 +38,38 @@ def get_nickname(current_user: dict = Depends(get_current_user)):
 
 @router.get("/profile")
 def profile(current_user: dict = Depends(get_current_user)):
-    print("当前用户信息：", current_user)
-    return {
-        "msg": "已登录",
-        "user": current_user
-    }
+    print("current_user:", current_user)
+    user_id = current_user.get("user_id")
+    print("user_id:", user_id)
+    
+    # 从数据库查询用户完整信息
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, username, nickname as name, role, create_time as createdAt 
+                FROM coach_user 
+                WHERE id = %s
+                """,
+                (user_id,)
+            )
+            user = cursor.fetchone()
+            print("查询结果:", user)
+    
+    if user:
+        # 转换时间格式
+        if user.get("createdAt"):
+            user["createdAt"] = user["createdAt"].strftime("%Y-%m-%d %H:%M:%S")
+        print("返回结果:", user)
+        return {
+            "msg": "已登录",
+            "user": user
+        }
+    else:
+        return {
+            "msg": "用户不存在",
+            "user": None
+        }
 
 # 新增：获取当前用户的岗位
 @router.get("/role")  # 建议用 GET（查询操作），POST 适合提交数据
@@ -142,16 +169,14 @@ def create_user(user: UserCreate, current_user: dict = Depends(get_current_user)
     return {"success": True, "message": "用户添加成功"}
 
 class UserUpdate(BaseModel):
-    id: int
-    username: str
     name: str
     password: str = None
-    role: str
 
 # 更新用户
 @router.post("/update")
 def update_user(user: UserUpdate, current_user: dict = Depends(get_current_user)):
     import hashlib
+    user_id = current_user.get("user_id")
     
     # 更新用户信息
     with get_db() as conn:
@@ -159,24 +184,24 @@ def update_user(user: UserUpdate, current_user: dict = Depends(get_current_user)
             if user.password:
                 # 哈希密码
                 hashed_password = hashlib.md5(user.password.encode()).hexdigest()
-                # 更新所有字段
+                # 更新昵称和密码
                 cursor.execute(
                     """
                     UPDATE coach_user 
-                    SET username = %s, password = %s, nickname = %s, role = %s
+                    SET nickname = %s, password = %s
                     WHERE id = %s
                     """,
-                    (user.username, hashed_password, user.name, user.role, user.id)
+                    (user.name, hashed_password, user_id)
                 )
             else:
-                # 不更新密码
+                # 只更新昵称
                 cursor.execute(
                     """
                     UPDATE coach_user 
-                    SET username = %s, nickname = %s, role = %s
+                    SET nickname = %s
                     WHERE id = %s
                     """,
-                    (user.username, user.name, user.role, user.id)
+                    (user.name, user_id)
                 )
             conn.commit()
     
