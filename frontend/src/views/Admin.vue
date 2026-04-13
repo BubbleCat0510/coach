@@ -11,10 +11,18 @@
         <div 
           class="menu-item" 
           :class="{ active: activeMenu === 'user' }"
-          @click="activeMenu = 'user'; showUserManagement = true"
+          @click="activeMenu = 'user'; showUserManagement = true; showFileUpload = false"
         >
           <el-icon class="menu-icon"><User /></el-icon>
           <span class="menu-text">用户管理</span>
+        </div>
+        <div 
+          class="menu-item" 
+          :class="{ active: activeMenu === 'file' }"
+          @click="activeMenu = 'file'; showFileUpload = true; showUserManagement = false"
+        >
+          <el-icon class="menu-icon"><Upload /></el-icon>
+          <span class="menu-text">文件上传</span>
         </div>
       </div>
       
@@ -74,49 +82,51 @@
           </div>
 
           <!-- 用户列表 -->
-        <el-table 
-          :data="filteredUsers" 
-          style="width: 100%" 
-          class="user-table"
-          v-loading="loading"
-          element-loading-text="加载中..."
-          element-loading-spinner="el-icon-loading"
-          element-loading-background="rgba(255, 255, 255, 0.8)"
-        >
-          <el-table-column prop="id" label="ID" width="80" />
+          <el-table 
+            :data="filteredUsers" 
+            style="width: 100%" 
+            class="user-table"
+            v-loading="loading"
+            element-loading-text="加载中..."
+            element-loading-spinner="el-icon-loading"
+            element-loading-background="rgba(255, 255, 255, 0.8)"
+          >
+            <el-table-column prop="id" label="ID" width="80" />
           <el-table-column prop="username" label="用户名" />
-          <el-table-column prop="name" label="姓名" />
-          <el-table-column prop="role" label="角色">
+          <el-table-column prop="name" label="姓名"  />
+          <el-table-column prop="role" label="角色" align="center" header-align="center">
             <template #default="scope">
               <el-tag effect="light" :type="getRoleType(scope.row.role)">
                 {{ scope.row.role || '未设置' }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="createdAt" label="创建时间" />
-          <el-table-column label="操作" width="180" fixed="right">
-            <template #default="scope">
-              <el-button
-                type="primary"
-                size="small"
-                @click="openEditUserDialog(scope.row)"
-                class="action-btn edit-btn"
-              >
-                <el-icon><Edit /></el-icon>
-                编辑
-              </el-button>
-              <el-button
-                type="danger"
-                size="small"
-                @click="deleteUser(scope.row)"
-                class="action-btn delete-btn"
-              >
-                <el-icon><Delete /></el-icon>
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+          <el-table-column prop="createdAt" label="创建时间" align="center" header-align="center" />
+          <el-table-column label="操作" width="160" fixed="right" align="center" header-align="center">
+              <template #default="scope">
+                <div class="action-buttons">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    @click="openEditUserDialog(scope.row)"
+                    class="action-btn edit-btn"
+                  >
+                    <el-icon><Edit /></el-icon>
+                    编辑
+                  </el-button>
+                  <el-button
+                    type="danger"
+                    size="small"
+                    @click="deleteUser(scope.row)"
+                    class="action-btn delete-btn"
+                  >
+                    <el-icon><Delete /></el-icon>
+                    删除
+                  </el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
 
           <!-- 分页 -->
           <div class="pagination">
@@ -129,6 +139,60 @@
               @size-change="handleSizeChange"
               @current-change="handleCurrentChange"
             />
+          </div>
+        </el-card>
+
+        <!-- 文件上传模块 -->
+        <el-card v-if="showFileUpload" class="file-upload-card">
+          <template #header>
+            <div class="card-header">
+              <span class="header-title">文件上传</span>
+            </div>
+          </template>
+
+          <div class="upload-container">
+            <el-upload
+              class="upload-demo"
+              action="http://localhost:8001/upload/file"
+              :on-success="handleUploadSuccess"
+              :on-error="handleUploadError"
+              :limit="5"
+              :file-list="fileList"
+              multiple
+            >
+              <el-button type="primary" class="upload-button">
+                <el-icon><Upload /></el-icon>
+                选择文件
+              </el-button>
+              <template #tip>
+                <div class="upload-tip">
+                  支持上传多种文件格式，单次最多上传5个文件
+                </div>
+              </template>
+            </el-upload>
+
+            <!-- 上传历史记录 -->
+            <div class="upload-history" v-if="uploadHistory.length > 0">
+              <h3 class="history-title">上传历史</h3>
+              <el-table :data="uploadHistory" style="width: 100%" class="history-table">
+                <el-table-column prop="name" label="文件名" />
+                <el-table-column prop="size" label="大小" width="120">
+                  <template #default="scope">
+                    {{ formatFileSize(scope.row.size) }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="type" label="类型" width="100" />
+                <el-table-column prop="uploadTime" label="上传时间" width="180" />
+                <el-table-column label="操作" width="120">
+                  <template #default="scope">
+                    <el-button size="small" type="primary" @click="downloadFile(scope.row)">
+                      <el-icon><Download /></el-icon>
+                      下载
+                    </el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
           </div>
         </el-card>
       </div>
@@ -175,7 +239,7 @@
 import { ref, computed, reactive, onMounted } from 'vue'
 import {
   User, Management, ArrowDown, SwitchButton,
-  Plus, Search, Edit, Delete
+  Plus, Search, Edit, Delete, Upload, Download
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
@@ -185,6 +249,7 @@ const router = useRouter()
 
 // 状态管理
 const showUserManagement = ref(true)
+const showFileUpload = ref(false)
 const searchQuery = ref('')
 const roleFilter = ref('')
 const currentPage = ref(1)
@@ -196,6 +261,25 @@ const activeMenu = ref('user')
 const showUserMenu = ref(true)
 const loading = ref(false)
 const userNickname = ref('管理员')
+
+// 文件上传相关状态
+const fileList = ref([])
+const uploadHistory = ref([
+  {
+    id: 1,
+    name: 'example.pdf',
+    size: 1024 * 1024,
+    type: 'PDF',
+    uploadTime: '2026-04-10 10:00:00'
+  },
+  {
+    id: 2,
+    name: 'data.xlsx',
+    size: 2 * 1024 * 1024,
+    type: 'Excel',
+    uploadTime: '2026-04-10 09:30:00'
+  }
+])
 
 // 用户数据
 const users = ref([])
@@ -289,6 +373,11 @@ const logout = () => {
   ElMessage.success('已退出登录')
   // 跳转到登录页
   router.push('/login')
+}
+
+const navigateToFileUpload = () => {
+  // 跳转到文件上传页面
+  router.push('/file-upload')
 }
 
 const openAddUserDialog = () => {
@@ -406,10 +495,47 @@ const pageTitle = computed(() => {
   switch (activeMenu.value) {
     case 'user':
       return '用户管理'
+    case 'file':
+      return '文件上传'
     default:
       return '管理员控制台'
   }
 })
+
+// 文件上传相关方法
+const handleUploadSuccess = (response, uploadFile, uploadFiles) => {
+  ElMessage.success('文件上传成功')
+  // 模拟添加到上传历史
+  const newFile = {
+    id: Date.now(),
+    name: uploadFile.name,
+    size: uploadFile.size,
+    type: uploadFile.type.split('/')[1].toUpperCase(),
+    uploadTime: new Date().toLocaleString('zh-CN')
+  }
+  uploadHistory.value.unshift(newFile)
+}
+
+const handleUploadError = (error, uploadFile, uploadFiles) => {
+  ElMessage.error('文件上传失败')
+  console.error('文件上传失败:', error)
+}
+
+const formatFileSize = (size) => {
+  if (size < 1024) {
+    return size + ' B'
+  } else if (size < 1024 * 1024) {
+    return (size / 1024).toFixed(2) + ' KB'
+  } else {
+    return (size / (1024 * 1024)).toFixed(2) + ' MB'
+  }
+}
+
+const downloadFile = (file) => {
+  ElMessage.success('开始下载文件: ' + file.name)
+  // 模拟下载
+  console.log('下载文件:', file)
+}
 
 // 获取角色标签类型
 const getRoleType = (role) => {
@@ -427,10 +553,11 @@ const getRoleType = (role) => {
 <style scoped>
 .admin-container {
   width: 100vw;
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   font-family: 'PingFang SC', 'Helvetica Neue', STHeiti, 'Microsoft Yahei', sans-serif;
+  overflow: hidden;
 }
 
 /* 侧边栏样式 */
@@ -555,26 +682,28 @@ const getRoleType = (role) => {
 }
 
 .admin-header {
-  background: #ffffff;
+  background: linear-gradient(135deg, #8DC149, #7ab838);
+  color: white;
   border-bottom: 1px solid #e8eef3;
   padding: 0 30px;
   display: flex;
   align-items: center;
   height: 70px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .page-title {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #333;
+  color: white;
 }
 
 .admin-content {
   flex: 1;
-  padding: 30px;
+  padding: 20px;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 /* 用户管理卡片 */
@@ -651,8 +780,14 @@ const getRoleType = (role) => {
   background-color: #e6f7ee !important;
 }
 
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
 .action-btn {
-  margin-right: 8px;
+  flex-shrink: 0;
 }
 
 .edit-btn {
@@ -721,13 +856,15 @@ const getRoleType = (role) => {
 
 /* 按钮样式 */
 .el-button--primary {
-  background-color: #2e8b57;
-  border-color: #2e8b57;
+  background-color: #409eff;
+  border-color: #409eff;
+  color: white;
 }
 
 .el-button--primary:hover {
-  background-color: #3cb371;
-  border-color: #3cb371;
+  background-color: #66b1ff;
+  border-color: #66b1ff;
+  color: white;
 }
 
 /* 对话框样式 */
@@ -785,11 +922,74 @@ const getRoleType = (role) => {
   background-color: #f4f4f5 !important;
   border-color: #e9e9eb !important;
   color: #606266 !important;
-}
-
+}/* 标签样式 */
 :deep(.el-tag--light.el-tag--custom) {
   background-color: #f0f5ff !important;
   border-color: #e6efff !important;
   color: #667cff !important;
+}
+
+/* 文件上传样式 */
+.file-upload-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.upload-container {
+  padding: 24px;
+}
+
+.upload-button {
+  margin-bottom: 20px;
+}
+
+.upload-tip {
+  font-size: 14px;
+  color: #909399;
+  margin-top: 10px;
+}
+
+.upload-history {
+  margin-top: 40px;
+}
+
+.history-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.history-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* 表格样式美化 */
+:deep(.history-table th) {
+  background-color: #e6f7ee !important;
+  font-weight: 600 !important;
+  color: #2e8b57 !important;
+  border-bottom: 2px solid #8DC149 !important;
+}
+
+/* 奇数行 */
+:deep(.history-table tr:nth-child(odd) td) {
+  vertical-align: middle !important;
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+
+/* 偶数行 */
+:deep(.history-table tr:nth-child(even) td) {
+  vertical-align: middle !important;
+  background-color: #f9fff5 !important;
+  border-bottom: 1px solid #f0f0f0 !important;
+}
+
+/* 悬停效果 */
+:deep(.history-table tr:hover td) {
+  background-color: #e6f7ee !important;
 }
 </style>
