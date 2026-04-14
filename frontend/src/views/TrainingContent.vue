@@ -63,8 +63,8 @@
                   @click="toggleSidebar"
                   :title="sidebarCollapsed ? '展开菜单' : '收起菜单'"
                 >
-            <el-icon v-if="sidebarCollapsed"><ArrowLeft /></el-icon>
-            <el-icon v-else><ArrowRight /></el-icon>
+            <el-icon v-if="sidebarCollapsed" style="font-size: 24px;"><Expand /></el-icon>
+            <el-icon v-else style="font-size: 24px;"><Fold /></el-icon>
           </el-button>
           <div class="breadcrumb">
             <el-breadcrumb separator="/">
@@ -214,7 +214,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { 
   House, ArrowLeft, ArrowRight, Star, StarFilled, 
-  Plus, Minus 
+  Plus, Minus, Expand, Fold 
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -548,14 +548,15 @@ const onUnmounted = () => {
 .training-content-layout {
   display: flex;
   height: 100vh;
-  background: #f5f7fa;
+  background: linear-gradient(135deg, #f5f7fa 0%, #f8fdfb 100%);
   transition: all 0.3s ease;
+  font-family: 'PingFang SC', 'Helvetica Neue', STHeiti, 'Microsoft Yahei', sans-serif;
 }
 
 /* 侧边栏 */
 .sidebar {
   width: 200px;
-  background: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fdfb 100%);
   border-right: 1px solid #e8eef3;
   display: flex;
   flex-direction: column;
@@ -572,16 +573,21 @@ const onUnmounted = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
-  border-bottom: 1px solid #f0f5f9;
+  padding: 12px 16px;
+  border-bottom: 2px solid #f0f5f9;
   transition: all 0.5s ease-in-out;
+  height: 64px;
+  box-sizing: border-box;
 }
 
 .logo h3 {
   margin: 0;
   font-size: 18px;
-  font-weight: 600;
-  color: #2f5d50;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1e5e4a 0%, #2f5d50 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   transition: all 0.5s ease-in-out;
   opacity: 0;
   transform: translateX(-20px);
@@ -610,9 +616,9 @@ const onUnmounted = () => {
 }
 
 .back-btn .el-icon {
-  font-size: 20px;
+  font-size: 24px;
   transition: all 0.5s ease-in-out;
-  min-width: 20px;
+  min-width: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -775,13 +781,15 @@ const onUnmounted = () => {
 }
 
 .content-header {
-  background: #ffffff;
-  border-bottom: 1px solid #f0f5f9;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  border-bottom: 2px solid #f0f5f9;
   padding: 12px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  height: 64px;
+  box-sizing: border-box;
 }
 
 .header-left {
@@ -831,6 +839,7 @@ const onUnmounted = () => {
   overflow-y: auto;
   padding: 24px;
   transition: transform 0.3s ease;
+  background: linear-gradient(135deg, #f5f7fa 0%, #f8fdfb 100%);
 }
 
 .loading-container,
@@ -847,14 +856,32 @@ const onUnmounted = () => {
   margin: 0 auto;
   background: #ffffff;
   padding: 32px;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(141, 193, 73, 0.1);
+  border: 1px solid rgba(141, 193, 73, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.content-body::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #98FB98, #7ab838, #98FB98);
+  transform: scaleX(1);
+  transform-origin: left;
+  transition: transform 0.3s ease;
 }
 
 .document-content h1 {
-  color: #1f2937;
+  color: #228b22;
   margin-bottom: 24px;
   font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .document-body {
@@ -863,13 +890,16 @@ const onUnmounted = () => {
 }
 
 .document-body h2 {
-  color: #1f2937;
+  color: #32cd32;
   margin: 24px 0 16px;
   font-size: 20px;
+  font-weight: 600;
 }
 
 .document-body p {
   margin-bottom: 16px;
+  color: #374151;
+  line-height: 1.8;
 }
 
 .preview-image {
@@ -885,13 +915,13 @@ const onUnmounted = () => {
 }
 
 .content-footer {
-  background: #ffffff;
-  border-top: 1px solid #f0f5f9;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  border-top: 2px solid #f0f5f9;
   padding: 16px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .progress-info {

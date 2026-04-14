@@ -8,7 +8,7 @@ load_dotenv()
 
 # 功能导入
 from utils.jwt import create_token
-from app.api import user, train, ai, exam
+from app.api import user, train, ai, exam, upload
 from app.core import db
 
 app = FastAPI()
@@ -17,6 +17,7 @@ app.include_router(user.router)
 app.include_router(train.router)
 app.include_router(ai.router)
 app.include_router(exam.router)
+app.include_router(upload.router)
 
 # ===== CORS 配置（必须加，浏览器规范要求：必须先 OPTIONS）=====
 app.add_middleware(

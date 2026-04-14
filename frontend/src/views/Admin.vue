@@ -153,7 +153,7 @@
           <div class="upload-container">
             <el-upload
               class="upload-demo"
-              action="http://localhost:8001/upload/file"
+              :http-request="customUpload"
               :on-success="handleUploadSuccess"
               :on-error="handleUploadError"
               :limit="5"
@@ -171,27 +171,84 @@
               </template>
             </el-upload>
 
+            <!-- 搜索 -->
+            <div class="search-filter" style="margin: 15px 0;">
+              <el-input
+                v-model="fileSearchQuery"
+                placeholder="搜索用户"
+                prefix-icon="Search"
+                class="search-input"
+              />
+            </div>
+
             <!-- 上传历史记录 -->
-            <div class="upload-history" v-if="uploadHistory.length > 0">
+            <div class="upload-history">
               <h3 class="history-title">上传历史</h3>
-              <el-table :data="uploadHistory" style="width: 100%" class="history-table">
+              <el-table 
+                :data="uploadHistory" 
+                style="width: 100%" 
+                class="history-table"
+                v-loading="loadingFiles"
+                element-loading-text="加载中..."
+                element-loading-spinner="el-icon-loading"
+                element-loading-background="rgba(255, 255, 255, 0.8)"
+              >
+                <el-table-column prop="id" label="ID" width="80" />
+                <el-table-column prop="username" label="上传用户" width="150" />
                 <el-table-column prop="name" label="文件名" />
                 <el-table-column prop="size" label="大小" width="120">
                   <template #default="scope">
                     {{ formatFileSize(scope.row.size) }}
                   </template>
                 </el-table-column>
-                <el-table-column prop="type" label="类型" width="100" />
-                <el-table-column prop="uploadTime" label="上传时间" width="180" />
-                <el-table-column label="操作" width="120">
+                <el-table-column prop="type" label="类型">
                   <template #default="scope">
-                    <el-button size="small" type="primary" @click="downloadFile(scope.row)">
-                      <el-icon><Download /></el-icon>
-                      下载
-                    </el-button>
+                    {{ formatFileType(scope.row.type) }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="uploadTime" label="上传时间" width="180" />
+                <el-table-column label="操作" width="160" fixed="right" align="center" header-align="center">
+                  <template #default="scope">
+                    <div class="action-buttons">
+                      <el-button
+                        type="primary"
+                        size="small"
+                        @click="downloadFile(scope.row)"
+                        class="action-btn download-btn"
+                      >
+                        <el-icon><Download /></el-icon>
+                        下载
+                      </el-button>
+                      <el-button
+                        type="danger"
+                        size="small"
+                        @click="deleteFile(scope.row)"
+                        class="action-btn delete-btn"
+                      >
+                        <el-icon><Delete /></el-icon>
+                        删除
+                      </el-button>
+                    </div>
                   </template>
                 </el-table-column>
               </el-table>
+              <div v-if="!loadingFiles && uploadHistory.length === 0" class="empty-history">
+                <el-empty description="暂无上传记录" />
+              </div>
+              
+              <!-- 分页 -->
+              <div class="file-pagination" v-if="!loadingFiles && totalFiles > 0">
+                <el-pagination
+                  v-model:current-page="currentFilePage"
+                  v-model:page-size="filePageSize"
+                  :page-sizes="[10, 20, 50, 100]"
+                  layout="total, sizes, prev, pager, next, jumper"
+                  :total="totalFiles"
+                  @size-change="handleFileSizeChange"
+                  @current-change="handleFileCurrentChange"
+                  style="float: right"
+                />
+              </div>
             </div>
           </div>
         </el-card>
@@ -236,14 +293,16 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
 import {
   User, Management, ArrowDown, SwitchButton,
   Plus, Search, Edit, Delete, Upload, Download
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
+import axios from 'axios'
 import { getUserList, getNickname, createUser, updateUser, deleteUser as deleteUserApi } from '@/api/user'
+import { uploadFile, getFileList, deleteFile as deleteFileApi } from '@/api/upload'
 
 const router = useRouter()
 
@@ -264,22 +323,12 @@ const userNickname = ref('管理员')
 
 // 文件上传相关状态
 const fileList = ref([])
-const uploadHistory = ref([
-  {
-    id: 1,
-    name: 'example.pdf',
-    size: 1024 * 1024,
-    type: 'PDF',
-    uploadTime: '2026-04-10 10:00:00'
-  },
-  {
-    id: 2,
-    name: 'data.xlsx',
-    size: 2 * 1024 * 1024,
-    type: 'Excel',
-    uploadTime: '2026-04-10 09:30:00'
-  }
-])
+const uploadHistory = ref([])
+const loadingFiles = ref(false)
+const currentFilePage = ref(1)
+const filePageSize = ref(10)
+const totalFiles = ref(0)
+const fileSearchQuery = ref('')
 
 // 用户数据
 const users = ref([])
@@ -312,6 +361,56 @@ const loadUsers = async () => {
   }
 }
 
+// 加载文件列表
+const loadFiles = async () => {
+  try {
+    loadingFiles.value = true
+    console.log('开始获取文件列表')
+    const response = await getFileList(currentFilePage.value, filePageSize.value, fileSearchQuery.value)
+    console.log('获取文件列表响应:', response)
+    if (response && response.success && response.files) {
+      console.log('文件列表数据:', response.files)
+      // 检查每个文件对象的结构
+      response.files.forEach((file, index) => {
+        console.log(`文件 ${index + 1} 数据:`, file)
+        console.log(`文件 ${index + 1} username:`, file.username)
+      })
+      uploadHistory.value = response.files
+      totalFiles.value = response.total || 0
+    } else {
+      console.error('获取文件列表失败，响应格式不正确:', response)
+    }
+  } catch (error) {
+    ElMessage.error('获取文件列表失败')
+    console.error('获取文件列表失败:', error)
+  } finally {
+    loadingFiles.value = false
+  }
+}
+
+// 搜索文件
+const handleFileSearch = () => {
+  currentFilePage.value = 1
+  loadFiles()
+}
+
+// 防抖函数
+const debounce = (fn, delay) => {
+  let timer = null
+  return (...args) => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      fn(...args)
+    }, delay)
+  }
+}
+
+// 监听搜索框变化
+watch(fileSearchQuery, debounce(() => {
+  currentFilePage.value = 1
+  loadFiles()
+}, 300))
+
 // 页面挂载时加载数据
 onMounted(() => {
   // 检查是否有token
@@ -322,6 +421,7 @@ onMounted(() => {
     return
   }
   loadUsers()
+  loadFiles()
 })
 
 // 表单数据
@@ -485,6 +585,18 @@ const handleCurrentChange = (current) => {
   currentPage.value = current
 }
 
+// 文件分页处理
+const handleFileSizeChange = (size) => {
+  filePageSize.value = size
+  currentFilePage.value = 1
+  loadFiles()
+}
+
+const handleFileCurrentChange = (current) => {
+  currentFilePage.value = current
+  loadFiles()
+}
+
 // 计算属性：用户头像
 const userAvatar = computed(() => {
   return `https://ui-avatars.com/api/?name=Admin&background=2e8b57&color=fff`
@@ -503,17 +615,23 @@ const pageTitle = computed(() => {
 })
 
 // 文件上传相关方法
+const customUpload = async (options) => {
+  try {
+    const response = await uploadFile(options.file)
+    if (response && response.success) {
+      options.onSuccess(response)
+    } else {
+      options.onError(new Error('文件上传失败'))
+    }
+  } catch (error) {
+    options.onError(error)
+  }
+}
+
 const handleUploadSuccess = (response, uploadFile, uploadFiles) => {
   ElMessage.success('文件上传成功')
-  // 模拟添加到上传历史
-  const newFile = {
-    id: Date.now(),
-    name: uploadFile.name,
-    size: uploadFile.size,
-    type: uploadFile.type.split('/')[1].toUpperCase(),
-    uploadTime: new Date().toLocaleString('zh-CN')
-  }
-  uploadHistory.value.unshift(newFile)
+  // 重新加载文件列表
+  loadFiles()
 }
 
 const handleUploadError = (error, uploadFile, uploadFiles) => {
@@ -531,21 +649,114 @@ const formatFileSize = (size) => {
   }
 }
 
-const downloadFile = (file) => {
-  ElMessage.success('开始下载文件: ' + file.name)
-  // 模拟下载
-  console.log('下载文件:', file)
+const formatFileType = (type) => {
+  if (!type) return '未知'
+  
+  const typeMap = {
+    'application/pdf': 'PDF 文档',
+    'application/msword': 'Word 文档',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word 文档',
+    'application/vnd.ms-excel': 'Excel 表格',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel 表格',
+    'application/vnd.ms-powerpoint': 'PowerPoint 演示文稿',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PowerPoint 演示文稿',
+    'image/jpeg': '图片',
+    'image/png': '图片',
+    'image/gif': '图片',
+    'image/bmp': '图片',
+    'image/webp': '图片',
+    'text/plain': '文本文件',
+    'text/html': 'HTML 文件',
+    'application/zip': '压缩文件',
+    'application/x-rar-compressed': '压缩文件',
+    'application/x-7z-compressed': '压缩文件',
+    'application/x-tar': '压缩文件',
+    'application/x-gzip': '压缩文件',
+    'video/mp4': '视频',
+    'video/avi': '视频',
+    'video/mov': '视频',
+    'video/wmv': '视频',
+    'audio/mpeg': '音频',
+    'audio/wav': '音频',
+    'audio/ogg': '音频'
+  }
+  
+  return typeMap[type] || type
+}
+
+const downloadFile = async (file) => {
+  try {
+    // 使用 axios 下载文件
+    const response = await axios({
+      url: `http://localhost:8001/upload/download/${file.id}`,
+      method: 'GET',
+      responseType: 'blob',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    
+    // 创建一个 Blob URL
+    const blob = new Blob([response.data])
+    const url = window.URL.createObjectURL(blob)
+    
+    // 创建一个隐藏的 a 标签来触发下载
+    const link = document.createElement('a')
+    link.href = url
+    link.download = file.name
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    
+    // 清理
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('文件下载成功: ' + file.name)
+  } catch (error) {
+    ElMessage.error('下载文件失败')
+    console.error('下载文件失败:', error)
+  }
+}
+
+const deleteFile = (file) => {
+  ElMessageBox.confirm(
+    `确定要删除文件 ${file.name} 吗？`,
+    '删除确认',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      // 调用后端删除文件的 API
+      const response = await deleteFileApi(file.id)
+      if (response.success) {
+        ElMessage.success('文件删除成功')
+        // 重新加载文件列表
+        loadFiles()
+      } else {
+        ElMessage.error('文件删除失败: ' + (response.message || '未知错误'))
+      }
+    } catch (error) {
+      ElMessage.error('文件删除失败')
+      console.error('文件删除失败:', error)
+    }
+  }).catch(() => {
+    // 用户取消删除
+  })
 }
 
 // 获取角色标签类型
 const getRoleType = (role) => {
   if (!role) return 'info'
   if (role === '管理员') return 'info'
-  if (role === '商铺开发') return 'custom'
+  if (role === '商铺开发') return 'primary'
   if (role === '品牌开发') return 'warning'
   if (role === '品牌选址') return 'danger'
-  if (role === '上门服务') return 'primary'
-  if (role === '商铺招商') return 'success'
+  if (role === '上门服务') return 'success'
+  if (role === '商铺招商') return 'info'
   return 'warning'
 }
 </script>
