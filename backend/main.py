@@ -24,6 +24,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # 前端地址
+        "http://localhost:5174",  # 前端地址（备用）
     ],
     allow_credentials=True,
     allow_methods=["*"],        # 允许所有方法（包括 OPTIONS）

@@ -548,7 +548,7 @@ const onUnmounted = () => {
 .training-content-layout {
   display: flex;
   height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #f8fdfb 100%);
+  background: #d9f4e6;
   transition: all 0.3s ease;
   font-family: 'PingFang SC', 'Helvetica Neue', STHeiti, 'Microsoft Yahei', sans-serif;
 }
@@ -556,13 +556,14 @@ const onUnmounted = () => {
 /* 侧边栏 */
 .sidebar {
   width: 200px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fdfb 100%);
-  border-right: 1px solid #e8eef3;
+  background: linear-gradient(135deg, #f0f9f4, #e6f7ee);
+  border-right: 1px solid rgba(141, 193, 73, 0.3);
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 2px 0 8px rgba(141, 193, 73, 0.2);
   transition: width 0.5s ease-in-out;
   overflow: hidden;
+  border-radius: 0 16px 16px 0;
 }
 
 .sidebar.collapsed {
@@ -574,20 +575,20 @@ const onUnmounted = () => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 2px solid #f0f5f9;
+  border-bottom: 2px solid rgba(141, 193, 73, 0.3);
   transition: all 0.5s ease-in-out;
   height: 64px;
   box-sizing: border-box;
+  background: linear-gradient(135deg, #8DC149, #7ab838);
+  color: white;
+  border-radius: 0 16px 0 0;
 }
 
 .logo h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  background: linear-gradient(135deg, #1e5e4a 0%, #2f5d50 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: white;
   transition: all 0.5s ease-in-out;
   opacity: 0;
   transform: translateX(-20px);
@@ -615,6 +616,11 @@ const onUnmounted = () => {
   position: relative;
 }
 
+.back-btn:hover {
+  background: rgba(141, 193, 73, 0.2) !important;
+  color: #228b22 !important;
+}
+
 .back-btn .el-icon {
   font-size: 24px;
   transition: all 0.5s ease-in-out;
@@ -622,6 +628,17 @@ const onUnmounted = () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: #32cd32;
+  background: rgba(152, 251, 152, 0.2);
+  padding: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.back-btn:hover .el-icon {
+  background: rgba(152, 251, 152, 0.4);
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(152, 251, 152, 0.4);
 }
 
 .back-btn span {
@@ -778,18 +795,25 @@ const onUnmounted = () => {
   display: flex;
   flex-direction: column;
   transition: all 0.5s ease-in-out;
+  margin: 20px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(141, 193, 73, 0.2);
+  background: linear-gradient(135deg, #f0f9f4, #e6f7ee);
+  border: 1px solid rgba(141, 193, 73, 0.3);
 }
 
 .content-header {
-  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
-  border-bottom: 2px solid #f0f5f9;
+  background: linear-gradient(135deg, #8DC149, #7ab838);
+  border-bottom: 2px solid rgba(141, 193, 73, 0.3);
   padding: 12px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(141, 193, 73, 0.2);
   height: 64px;
   box-sizing: border-box;
+  color: white;
 }
 
 .header-left {
@@ -800,17 +824,25 @@ const onUnmounted = () => {
 }
 
 .sidebar-toggle-btn {
-  color: #6b7280;
+  color: white;
   transition: all 0.3s ease-in-out;
 }
 
 .sidebar-toggle-btn:hover {
-  color: #2f5d50;
-  background: rgba(52, 211, 153, 0.1);
+  color: #f0f9f4;
+  background: rgba(255, 255, 255, 0.2) !important;
 }
 
 .breadcrumb {
   flex: 1;
+}
+
+.breadcrumb :deep(.el-breadcrumb__inner) {
+  color: white !important;
+}
+
+.breadcrumb :deep(.el-breadcrumb__separator) {
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 
 .toolbar {
@@ -831,7 +863,15 @@ const onUnmounted = () => {
   min-width: 40px;
   text-align: center;
   font-size: 12px;
-  color: #6b7280;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.toolbar :deep(.el-button) {
+  color: white !important;
+}
+
+.toolbar :deep(.el-button:hover) {
+  background: rgba(255, 255, 255, 0.2) !important;
 }
 
 .content-display {
@@ -839,7 +879,7 @@ const onUnmounted = () => {
   overflow-y: auto;
   padding: 24px;
   transition: transform 0.3s ease;
-  background: linear-gradient(135deg, #f5f7fa 0%, #f8fdfb 100%);
+  background: linear-gradient(135deg, #f0f9f4, #e6f7ee);
 }
 
 .loading-container,
@@ -854,13 +894,19 @@ const onUnmounted = () => {
 .content-body {
   max-width: 800px;
   margin: 0 auto;
-  background: #ffffff;
+  background: white;
   padding: 32px;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(141, 193, 73, 0.1);
-  border: 1px solid rgba(141, 193, 73, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(141, 193, 73, 0.2);
+  border: 1px solid rgba(141, 193, 73, 0.3);
   position: relative;
   overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.content-body:hover {
+  box-shadow: 0 8px 32px rgba(141, 193, 73, 0.3);
+  transform: translateY(-2px);
 }
 
 .content-body::before {
@@ -915,13 +961,14 @@ const onUnmounted = () => {
 }
 
 .content-footer {
-  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
-  border-top: 2px solid #f0f5f9;
+  background: linear-gradient(135deg, #8DC149, #7ab838);
+  border-top: 2px solid rgba(141, 193, 73, 0.3);
   padding: 16px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 -2px 8px rgba(141, 193, 73, 0.2);
+  color: white;
 }
 
 .progress-info {
@@ -932,8 +979,24 @@ const onUnmounted = () => {
 .progress-info span {
   display: block;
   font-size: 12px;
-  color: #6b7280;
+  color: rgba(255, 255, 255, 0.9);
   margin-bottom: 4px;
+}
+
+.content-footer :deep(.el-button) {
+  color: white !important;
+}
+
+.content-footer :deep(.el-button:hover) {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.content-footer :deep(.el-progress__bar) {
+  background-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.content-footer :deep(.el-progress__inner) {
+  background-color: #98FB98 !important;
 }
 
 /* 响应式设计 */

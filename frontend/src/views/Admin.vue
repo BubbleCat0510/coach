@@ -720,6 +720,8 @@ const downloadFile = async (file) => {
 }
 
 const deleteFile = (file) => {
+  console.log('删除文件请求，file对象:', file)
+  console.log('file.id:', file.id)
   ElMessageBox.confirm(
     `确定要删除文件 ${file.name} 吗？`,
     '删除确认',
@@ -731,7 +733,9 @@ const deleteFile = (file) => {
   ).then(async () => {
     try {
       // 调用后端删除文件的 API
+      console.log('调用 deleteFileApi，fileId:', file.id)
       const response = await deleteFileApi(file.id)
+      console.log('删除文件响应:', response)
       if (response.success) {
         ElMessage.success('文件删除成功')
         // 重新加载文件列表
