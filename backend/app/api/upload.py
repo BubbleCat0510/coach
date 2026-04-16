@@ -132,7 +132,7 @@ def get_file_list(page: int = 1, pageSize: int = 10, search: str = "", current_u
         }
 
 @router.get("/download/{file_id}")
-def download_file(file_id: int, current_user: dict = Depends(get_current_user)):
+def download_file(file_id: int):
     try:
         # 从数据库中获取文件信息
         with get_db() as conn:
@@ -161,12 +161,64 @@ def download_file(file_id: int, current_user: dict = Depends(get_current_user)):
                         "message": "文件不存在"
                     }
 
-                # 返回文件
-                return FileResponse(
-                    path=file_path,
-                    filename=file_name,
-                    media_type='application/octet-stream'
-                )
+                # 根据文件扩展名设置适当的 media type
+                import mimetypes
+                extension = os.path.splitext(file_name)[1].lower()
+                media_type, _ = mimetypes.guess_type(file_name)
+                if not media_type:
+                    # 对于常见文件类型，手动设置 media type
+                    if extension in ['.txt', '.md', '.log']:
+                        media_type = 'text/plain'
+                    elif extension in ['.html', '.htm']:
+                        media_type = 'text/html'
+                    elif extension in ['.css']:
+                        media_type = 'text/css'
+                    elif extension in ['.js']:
+                        media_type = 'application/javascript'
+                    elif extension in ['.json']:
+                        media_type = 'application/json'
+                    elif extension in ['.xml']:
+                        media_type = 'application/xml'
+                    elif extension in ['.csv']:
+                        media_type = 'text/csv'
+                    elif extension in ['.pdf']:
+                        media_type = 'application/pdf'
+                    elif extension in ['.doc', '.docx']:
+                        media_type = 'application/msword'
+                    elif extension in ['.xls', '.xlsx']:
+                        media_type = 'application/vnd.ms-excel'
+                    elif extension in ['.ppt', '.pptx']:
+                        media_type = 'application/vnd.ms-powerpoint'
+                    elif extension in ['.jpg', '.jpeg']:
+                        media_type = 'image/jpeg'
+                    elif extension in ['.png']:
+                        media_type = 'image/png'
+                    elif extension in ['.gif']:
+                        media_type = 'image/gif'
+                    elif extension in ['.mp4']:
+                        media_type = 'video/mp4'
+                    elif extension in ['.mp3']:
+                        media_type = 'audio/mpeg'
+                    else:
+                        media_type = 'application/octet-stream'
+                
+                # 为 PDF 文件设置 Content-Disposition 为 inline，使其在浏览器中显示而不是下载
+                from fastapi.responses import FileResponse
+                if extension == '.pdf':
+                    return FileResponse(
+                        path=file_path,
+                        filename=file_name,
+                        media_type=media_type,
+                        headers={
+                            'Content-Disposition': f'inline; filename="{file_name}"'
+                        }
+                    )
+                else:
+                    return FileResponse(
+                        path=file_path,
+                        filename=file_name,
+                        media_type=media_type
+                    )
     except Exception as e:
         return {
             "success": False,

@@ -30,25 +30,18 @@
 
       <!-- 分类菜单 -->
       <div class="category-menu" v-if="!sidebarCollapsed">
-        <el-tree
-          :data="categories"
-          :props="treeProps"
-          node-key="id"
-          default-expand-all
-          @node-click="handleCategoryClick"
-          :current-node-key="currentCategoryId"
-          :highlight-current="true"
-          class="category-tree"
+        <div 
+          v-for="file in files" 
+          :key="file.id"
+          class="tree-node"
+          :class="{ 'is-current': currentCategoryId === file.id }"
+          @click="handleCategoryClick({ id: file.id, file: file })"
         >
-          <template #default="{ node, data }">
-            <div class="tree-node">
-              <el-icon v-if="data.icon">
-                <component :is="data.icon" />
-              </el-icon>
-              <span>{{ node.label }}</span>
-            </div>
-          </template>
-        </el-tree>
+          <el-icon v-if="getFileIcon(file.type)">
+            <component :is="getFileIcon(file.type)" />
+          </el-icon>
+          <span>{{ file.name }}</span>
+        </div>
       </div>
     </aside>
 
@@ -145,7 +138,55 @@
           <!-- 文档类内容 -->
           <div v-if="contentType === 'document'" class="document-content">
             <h1>{{ content.title }}</h1>
-            <div v-html="content.content" class="document-body"></div>
+            <div class="document-body">
+              <!-- 文本文件预览 -->
+              <div v-if="isTextFile(content.file)" class="text-preview">
+                <pre v-if="fileContent" class="text-content">{{ fileContent }}</pre>
+                <el-skeleton v-else :loading="loadingContent" animated>
+                  <template #template>
+                    <el-skeleton-item variant="p" style="width: 100%" />
+                    <el-skeleton-item variant="p" style="width: 90%" />
+                    <el-skeleton-item variant="p" style="width: 95%" />
+                    <el-skeleton-item variant="p" style="width: 85%" />
+                    <el-skeleton-item variant="p" style="width: 100%" />
+                  </template>
+                </el-skeleton>
+              </div>
+              
+              <!-- PDF 文件预览 -->
+              <div v-else-if="isPdfFile(content.file)" class="pdf-preview">
+                <iframe :src="content.url" width="100%" height="600px" frameborder="0"></iframe>
+              </div>
+              
+              <!-- Office 文件预览 -->
+              <div v-else-if="isOfficeFile(content.file)" class="office-preview">
+                <p style="margin-left: 20px;">这是一个 Office 文件，您可以点击下方链接下载查看：</p>
+                <div style="margin-left: 20px;margin-bottom: 20px;">
+                  <el-button type="primary" @click="downloadFile(content.file)">
+                    <el-icon><Download /></el-icon>
+                    下载文件
+                  </el-button>
+                </div>
+              </div>
+              
+              <!-- 其他文档类型 -->
+              <div v-else class="other-document">
+                <p style="margin-left: 20px;">这是一个文档文件，您可以点击下方链接下载查看：</p>
+                <div style="margin-left: 20px;margin-bottom: 20px;">
+                  <el-button type="primary" @click="downloadFile(content.file)">
+                    <el-icon><Download /></el-icon>
+                    下载文件
+                  </el-button>
+                </div>
+              </div>
+              
+              <div v-if="content.file" class="file-info">
+                <p><strong>文件大小：</strong>{{ formatFileSize(content.file.size) }}</p>
+                <p><strong>文件类型：</strong>{{ formatFileType(content.file.type) }}</p>
+                <p><strong>上传时间：</strong>{{ content.file.uploadTime }}</p>
+                <p><strong>上传用户：</strong>{{ content.file.username }}</p>
+              </div>
+            </div>
           </div>
 
           <!-- 图片类内容 -->
@@ -168,6 +209,18 @@
             >
               您的浏览器不支持视频播放
             </video>
+          </div>
+
+          <!-- 音频类内容 -->
+          <div v-else-if="contentType === 'audio'" class="audio-content">
+            <h1>{{ content.title }}</h1>
+            <audio
+              :src="content.url"
+              controls
+              class="preview-audio"
+            >
+              您的浏览器不支持音频播放
+            </audio>
           </div>
 
           <!-- 空内容 -->
@@ -209,13 +262,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { 
   House, ArrowLeft, ArrowRight, Star, StarFilled, 
-  Plus, Minus, Expand, Fold 
+  Plus, Minus, Expand, Fold, Document, Picture, VideoCamera, Download 
 } from '@element-plus/icons-vue'
+import { getFileList } from '@/api/upload'
+import axios from 'axios'
 
 const router = useRouter()
 
@@ -228,43 +283,58 @@ const content = ref({})
 const loading = ref(false)
 const error = ref(false)
 
+// 文件列表相关状态
+const files = ref([])
+const loadingFiles = ref(false)
+
 const zoomLevel = ref(100)
 const isFavorited = ref(false)
 const progressPercentage = ref(0)
 
-// 计算属性
-const treeProps = {
-  children: 'children',
-  label: 'name'
-}
+// 文件内容预览相关状态
+const fileContent = ref('')
+const loadingContent = ref(false)
 
 const breadcrumb = computed(() => {
   const path = []
-  let current = currentCategoryId.value
-  while (current) {
-    const category = findCategoryById(categories.value, current)
-    if (category) {
-      path.unshift({ id: category.id, label: category.name })
-      current = category.parentId
-    } else {
-      break
+  const current = currentCategoryId.value
+  if (current) {
+    const file = files.value.find(f => f.id === current)
+    if (file) {
+      path.push({ id: file.id, label: file.name })
     }
   }
   return path
 })
 
 const contentType = computed(() => {
-  if (!content.value.url) return 'document'
-  const extension = content.value.url.split('.').pop().toLowerCase()
-  if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) {
+  if (!content.value.file) return 'document'
+  const fileType = content.value.file.type
+  if (!fileType) {
+    // 如果没有文件类型，根据文件名扩展名判断
+    const extension = content.value.file.name.split('.').pop().toLowerCase()
+    if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension)) {
+      return 'image'
+    } else if (['mp4', 'webm', 'avi', 'mov', 'wmv'].includes(extension)) {
+      return 'video'
+    } else if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'html'].includes(extension)) {
+      return 'document'
+    }
+    return 'document'
+  }
+  
+  // 根据 MIME 类型判断
+  if (fileType.startsWith('image/')) {
     return 'image'
-  } else if (['mp4', 'webm'].includes(extension)) {
+  } else if (fileType.startsWith('video/')) {
     return 'video'
+  } else if (fileType.startsWith('audio/')) {
+    return 'audio'
+  } else if (['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'text/plain', 'text/html', 'text/markdown'].includes(fileType)) {
+    return 'document'
   }
   return 'document'
 })
-
-
 
 const hasPrevious = ref(false)
 const hasNext = ref(false)
@@ -295,17 +365,6 @@ const backToDashboard = () => {
   router.push('/dashboard')
 }
 
-const findCategoryById = (categories, id) => {
-  for (const category of categories) {
-    if (category.id === id) return category
-    if (category.children) {
-      const found = findCategoryById(category.children, id)
-      if (found) return found
-    }
-  }
-  return null
-}
-
 const handleCategoryClick = (data) => {
   currentCategoryId.value = data.id
   loadContent(data.id)
@@ -320,35 +379,47 @@ const loadContent = async (categoryId) => {
   error.value = false
   
   try {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // 模拟数据
-    content.value = {
-      id: categoryId,
-      title: `培训内容 ${categoryId}`,
-      content: `<h2>章节 1</h2><p>这是培训内容的第一章节，包含详细的知识点和操作指南。</p><h2>章节 2</h2><p>这是培训内容的第二章节，包含更多的实践案例和应用场景。</p>`,
-      url: categoryId % 3 === 0 ? 'https://example.com/sample.jpg' : 
-           categoryId % 3 === 1 ? 'https://example.com/sample.mp4' : ''
-    }
-    
-    // 模拟收藏状态
-    isFavorited.value = categoryId % 2 === 0
-    
-    // 模拟进度
-    progressPercentage.value = Math.floor(Math.random() * 100)
-    
-    // 模拟上下篇
-    hasPrevious.value = categoryId > 1
-    hasNext.value = categoryId < 10
-    
-    // 恢复滚动位置
-    nextTick(() => {
-      const savedScroll = localStorage.getItem(`scroll_${categoryId}`)
-      if (savedScroll) {
-        window.scrollTo(0, parseInt(savedScroll))
+    // 查找对应的文件
+    const file = files.value.find(f => f.id === categoryId)
+    if (file) {
+      // 根据文件类型设置内容
+      content.value = {
+        id: file.id,
+        title: file.name,
+        url: `http://localhost:8001/upload/download/${file.id}`,
+        file: file
       }
-    })
+      
+      // 加载文本文件内容
+      if (isTextFile(file)) {
+        await loadTextFileContent(file.id)
+      } else {
+        fileContent.value = ''
+      }
+      
+      // 模拟收藏状态
+      isFavorited.value = categoryId % 2 === 0
+      
+      // 模拟进度
+      progressPercentage.value = Math.floor(Math.random() * 100)
+      
+      // 模拟上下篇
+      const fileIndex = files.value.findIndex(f => f.id === categoryId)
+      hasPrevious.value = fileIndex > 0
+      hasNext.value = fileIndex < files.value.length - 1
+      
+      // 恢复滚动位置
+      nextTick(() => {
+        const savedScroll = localStorage.getItem(`scroll_${categoryId}`)
+        if (savedScroll) {
+          window.scrollTo(0, parseInt(savedScroll))
+        }
+      })
+    } else {
+      // 没有找到文件，显示空内容
+      content.value = {}
+      ElMessage.warning('未找到文件')
+    }
   } catch (err) {
     console.error('加载内容失败:', err)
     error.value = true
@@ -358,7 +429,55 @@ const loadContent = async (categoryId) => {
   }
 }
 
+// 加载文本文件内容
+const loadTextFileContent = async (fileId) => {
+  loadingContent.value = true
+  try {
+    const response = await axios({
+      url: `http://localhost:8001/upload/download/${fileId}`,
+      method: 'GET',
+      responseType: 'text',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    fileContent.value = response.data
+  } catch (error) {
+    console.error('加载文件内容失败:', error)
+    fileContent.value = ''
+  } finally {
+    loadingContent.value = false
+  }
+}
 
+// 判断是否为文本文件
+const isTextFile = (file) => {
+  if (!file) return false
+  const extension = file.name.split('.').pop().toLowerCase()
+  return ['txt', 'md', 'html', 'css', 'js', 'json', 'xml', 'csv', 'log'].includes(extension)
+}
+
+// 判断是否为PDF文件
+const isPdfFile = (file) => {
+  if (!file) return false
+  const extension = file.name.split('.').pop().toLowerCase()
+  return extension === 'pdf'
+}
+
+// 判断是否为Office文件
+const isOfficeFile = (file) => {
+  if (!file) return false
+  const extension = file.name.split('.').pop().toLowerCase()
+  return ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(extension)
+}
+
+// 获取Office文件预览URL
+const getOfficePreviewUrl = (file) => {
+  // 在开发环境下，由于Office Online无法访问localhost，直接返回下载链接
+  // 生产环境可以使用Office Online预览
+  const fileUrl = `http://localhost:8001/upload/download/${file.id}`
+  return fileUrl
+}
 
 const zoomIn = () => {
   if (zoomLevel.value < 200) {
@@ -372,27 +491,114 @@ const zoomOut = () => {
   }
 }
 
-
-
 const toggleFavorite = () => {
   isFavorited.value = !isFavorited.value
   ElMessage.success(isFavorited.value ? '已添加到收藏' : '已取消收藏')
   // 同步到后端
 }
 
+// 下载文件
+const downloadFile = async (file) => {
+  try {
+    // 使用 axios 下载文件
+    const response = await axios({
+      url: `http://localhost:8001/upload/download/${file.id}`,
+      method: 'GET',
+      responseType: 'blob',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    
+    // 创建一个 Blob URL
+    const blob = new Blob([response.data])
+    const url = window.URL.createObjectURL(blob)
+    
+    // 创建一个隐藏的 a 标签来触发下载
+    const link = document.createElement('a')
+    link.href = url
+    link.download = file.name
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    
+    // 清理
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('文件下载成功: ' + file.name)
+  } catch (error) {
+    ElMessage.error('下载文件失败')
+    console.error('下载文件失败:', error)
+  }
+}
+
+// 格式化文件大小
+const formatFileSize = (size) => {
+  if (size < 1024) {
+    return size + ' B'
+  } else if (size < 1024 * 1024) {
+    return (size / 1024).toFixed(2) + ' KB'
+  } else {
+    return (size / (1024 * 1024)).toFixed(2) + ' MB'
+  }
+}
+
+// 格式化文件类型
+const formatFileType = (type) => {
+  if (!type) return '未知'
+  
+  const typeMap = {
+    'application/pdf': 'PDF 文档',
+    'application/msword': 'Word 文档',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word 文档',
+    'application/vnd.ms-excel': 'Excel 表格',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel 表格',
+    'application/vnd.ms-powerpoint': 'PowerPoint 演示文稿',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PowerPoint 演示文稿',
+    'image/jpeg': '图片',
+    'image/png': '图片',
+    'image/gif': '图片',
+    'image/bmp': '图片',
+    'image/webp': '图片',
+    'text/plain': '文本文件',
+    'text/html': 'HTML 文件',
+    'application/zip': '压缩文件',
+    'application/x-rar-compressed': '压缩文件',
+    'application/x-7z-compressed': '压缩文件',
+    'application/x-tar': '压缩文件',
+    'application/x-gzip': '压缩文件',
+    'video/mp4': '视频',
+    'video/avi': '视频',
+    'video/mov': '视频',
+    'video/wmv': '视频',
+    'audio/mpeg': '音频',
+    'audio/wav': '音频',
+    'audio/ogg': '音频'
+  }
+  
+  return typeMap[type] || type
+}
+
 const previousContent = () => {
   if (hasPrevious.value) {
-    const prevId = currentCategoryId.value - 1
-    currentCategoryId.value = prevId
-    loadContent(prevId)
+    const fileIndex = files.value.findIndex(f => f.id === currentCategoryId.value)
+    if (fileIndex > 0) {
+      const prevFile = files.value[fileIndex - 1]
+      currentCategoryId.value = prevFile.id
+      loadContent(prevFile.id)
+    }
   }
 }
 
 const nextContent = () => {
   if (hasNext.value) {
-    const nextId = currentCategoryId.value + 1
-    currentCategoryId.value = nextId
-    loadContent(nextId)
+    const fileIndex = files.value.findIndex(f => f.id === currentCategoryId.value)
+    if (fileIndex < files.value.length - 1) {
+      const nextFile = files.value[fileIndex + 1]
+      currentCategoryId.value = nextFile.id
+      loadContent(nextFile.id)
+    }
   }
 }
 
@@ -446,72 +652,37 @@ const handleScroll = () => {
   }
 }
 
-// 模拟加载分类数据
+// 根据文件类型获取图标
+const getFileIcon = (fileType) => {
+  if (!fileType) {
+    return 'Document'
+  }
+  
+  if (fileType.startsWith('image/')) {
+    return 'Picture'
+  } else if (fileType.startsWith('video/')) {
+    return 'VideoCamera'
+  } else if (fileType.startsWith('audio/')) {
+    return 'VideoCamera'
+  } else {
+    return 'Document'
+  }
+}
+
+// 加载文件列表
 const loadCategories = async () => {
   try {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // 模拟数据
-    categories.value = [
-      {
-        id: 1,
-        name: '产品知识',
-        icon: 'Goods',
-        children: [
-          {
-            id: 2,
-            name: '产品介绍',
-            children: [
-              { id: 3, name: '核心功能' },
-              { id: 4, name: '使用场景' }
-            ]
-          },
-          {
-            id: 5,
-            name: '产品更新',
-            children: [
-              { id: 6, name: '版本历史' },
-              { id: 7, name: '新功能介绍' }
-            ]
-          }
-        ]
-      },
-      {
-        id: 8,
-        name: '操作指南',
-        icon: 'Operation',
-        children: [
-          {
-            id: 9,
-            name: '基础操作',
-            children: [
-              { id: 10, name: '账号管理' },
-              { id: 11, name: '系统设置' }
-            ]
-          },
-          {
-            id: 12,
-            name: '高级功能',
-            children: [
-              { id: 13, name: '数据分析' },
-              { id: 14, name: '自动化流程' }
-            ]
-          }
-        ]
-      },
-      {
-        id: 15,
-        name: '常见问题',
-        icon: 'QuestionFilled',
-        children: [
-          { id: 16, name: '技术问题' },
-          { id: 17, name: '业务问题' }
-        ]
-      }
-    ]
+    loadingFiles.value = true
+    // 调用API获取文件列表
+    const response = await getFileList(1, 100, '')
+    if (response && response.success && response.files) {
+      files.value = response.files
+    }
   } catch (err) {
-    console.error('加载分类失败:', err)
+    console.error('加载文件列表失败:', err)
+    ElMessage.error('加载文件列表失败，请重试')
+  } finally {
+    loadingFiles.value = false
   }
 }
 
@@ -538,10 +709,10 @@ onMounted(async () => {
 })
 
 // 清理事件监听
-const onUnmounted = () => {
+onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('scroll', handleScroll)
-}
+})
 </script>
 
 <style scoped>
@@ -555,7 +726,7 @@ const onUnmounted = () => {
 
 /* 侧边栏 */
 .sidebar {
-  width: 200px;
+  width: 280px;
   background: linear-gradient(135deg, #f0f9f4, #e6f7ee);
   border-right: 1px solid rgba(141, 193, 73, 0.3);
   display: flex;
@@ -662,7 +833,7 @@ const onUnmounted = () => {
 .category-menu {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 8px;
   transition: all 0.5s ease-in-out;
   opacity: 0;
   transform: translateX(-20px);
@@ -673,56 +844,44 @@ const onUnmounted = () => {
 .tree-node {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  background-color: transparent;
+}
+
+.tree-node:hover {
+  background-color: rgba(141, 193, 73, 0.15);
+}
+
+.tree-node.is-current {
+  background-color: rgba(141, 193, 73, 0.2);
 }
 
 .tree-node .el-icon {
-  font-size: 20px;
+  font-size: 16px;
   transition: all 0.5s ease-in-out;
+  min-width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #32cd32;
+  background: rgba(152, 251, 152, 0.2);
+  padding: 3px;
+  border-radius: 3px;
 }
 
 .tree-node span {
   opacity: 0;
   transform: translateX(-10px);
   animation: slideIn 0.5s ease-in-out forwards;
-}
-
-/* 为每个树节点添加不同的动画延迟，实现逐个显示效果 */
-.el-tree-node {
-  animation: fadeIn 0.5s ease-in-out forwards;
-  opacity: 0;
-}
-
-.el-tree-node:nth-child(1) {
-  animation-delay: 0.4s;
-}
-
-.el-tree-node:nth-child(2) {
-  animation-delay: 0.5s;
-}
-
-.el-tree-node:nth-child(3) {
-  animation-delay: 0.6s;
-}
-
-.el-tree-node:nth-child(4) {
-  animation-delay: 0.7s;
-}
-
-.el-tree-node:nth-child(5) {
-  animation-delay: 0.8s;
-}
-
-/* 侧边栏收起时的图标居中 */
-.sidebar.collapsed .back-btn {
-  justify-content: center;
-  transition: all 0.5s ease-in-out;
-}
-
-/* 侧边栏收起时隐藏标题 */
-.sidebar.collapsed .logo h3 {
-  display: none;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background-color: transparent;
 }
 
 /* 动画定义 */
@@ -775,18 +934,6 @@ const onUnmounted = () => {
   .tree-node .el-icon {
     font-size: 18px;
   }
-}
-
-.category-tree {
-  --el-tree-node-content-hover-bg-color: rgba(52, 211, 153, 0.08);
-  --el-tree-node-hover-bg-color: rgba(52, 211, 153, 0.08);
-  --el-tree-node-current-bg-color: rgba(52, 211, 153, 0.15);
-}
-
-.tree-node {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 /* 主内容区 */
@@ -850,8 +997,6 @@ const onUnmounted = () => {
   align-items: center;
   gap: 12px;
 }
-
-
 
 .zoom-controls {
   display: flex;
@@ -948,6 +1093,34 @@ const onUnmounted = () => {
   line-height: 1.8;
 }
 
+/* 文本文件预览样式 */
+.text-preview {
+  margin-bottom: 20px;
+}
+
+.text-content {
+  background-color: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+/* PDF 和 Office 文件预览样式 */
+.pdf-preview,
+.office-preview {
+  margin-bottom: 20px;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 .preview-image {
   max-width: 100%;
   max-height: 600px;
@@ -958,6 +1131,29 @@ const onUnmounted = () => {
   width: 100%;
   max-height: 600px;
   margin: 20px 0;
+}
+
+.preview-audio {
+  width: 100%;
+  margin: 20px 0;
+}
+
+.file-info {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.file-info p {
+  margin-bottom: 8px;
+  color: #495057;
+}
+
+.file-info p strong {
+  color: #2c3e50;
+  margin-right: 8px;
 }
 
 .content-footer {
