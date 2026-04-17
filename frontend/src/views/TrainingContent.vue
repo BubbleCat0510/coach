@@ -106,7 +106,7 @@
       </div>
 
       <!-- 内容展示区 -->
-      <div class="content-display" :style="{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top left' }">
+      <div ref="contentDisplayRef" class="content-display" :style="{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top left' }">
         <!-- 加载状态 -->
         <div v-if="loading" class="loading-container">
           <el-skeleton :loading="true" animated>
@@ -160,9 +160,13 @@
               
               <!-- Office 文件预览 -->
               <div v-else-if="isOfficeFile(content.file)" class="office-preview">
-                <p style="margin-left: 20px;">这是一个 Office 文件，您可以点击下方链接下载查看：</p>
-                <div style="margin-left: 20px;margin-bottom: 20px;">
-                  <el-button type="primary" @click="downloadFile(content.file)">
+                <div class="office-preview-content">
+                  <div class="office-icon">
+                    <el-icon size="64"><Document /></el-icon>
+                  </div>
+                  <p class="office-name">{{ content.file?.name }}</p>
+                  <p class="office-tip">此文件不支持在浏览器中直接预览</p>
+                  <el-button type="primary" size="large" @click="downloadFile(content.file)">
                     <el-icon><Download /></el-icon>
                     下载文件
                   </el-button>
@@ -400,8 +404,8 @@ const loadContent = async (categoryId) => {
       // 模拟收藏状态
       isFavorited.value = categoryId % 2 === 0
       
-      // 模拟进度
-      progressPercentage.value = Math.floor(Math.random() * 100)
+      // 初始进度设置
+      progressPercentage.value = 0
       
       // 模拟上下篇
       const fileIndex = files.value.findIndex(f => f.id === categoryId)
@@ -411,8 +415,17 @@ const loadContent = async (categoryId) => {
       // 恢复滚动位置
       nextTick(() => {
         const savedScroll = localStorage.getItem(`scroll_${categoryId}`)
-        if (savedScroll) {
-          window.scrollTo(0, parseInt(savedScroll))
+        if (savedScroll && contentDisplayRef.value) {
+          contentDisplayRef.value.scrollTop = parseInt(savedScroll)
+        }
+        
+        // 检查是否有滚动条，如果没有直接显示100%
+        if (contentDisplayRef.value) {
+          const scrollHeight = contentDisplayRef.value.scrollHeight
+          const clientHeight = contentDisplayRef.value.clientHeight
+          if (scrollHeight <= clientHeight) {
+            progressPercentage.value = 100
+          }
         }
       })
     } else {
@@ -640,15 +653,30 @@ const handleKeydown = (event) => {
 }
 
 // 滚动事件，记录阅读进度
+const contentDisplayRef = ref(null)
+
 const handleScroll = () => {
-  const scrollTop = window.scrollY
-  const docHeight = document.documentElement.scrollHeight - window.innerHeight
-  const progress = Math.round((scrollTop / docHeight) * 100)
-  progressPercentage.value = progress
-  
-  // 保存滚动位置
-  if (currentCategoryId.value) {
-    localStorage.setItem(`scroll_${currentCategoryId.value}`, scrollTop)
+  if (contentDisplayRef.value) {
+    const scrollTop = contentDisplayRef.value.scrollTop
+    const scrollHeight = contentDisplayRef.value.scrollHeight
+    const clientHeight = contentDisplayRef.value.clientHeight
+    const docHeight = scrollHeight - clientHeight
+    
+    if (docHeight > 0) {
+      const progress = Math.round((scrollTop / docHeight) * 100)
+      // 只有当当前进度小于100%时才更新
+      if (progressPercentage.value < 100) {
+        progressPercentage.value = progress
+      }
+    } else {
+      // 没有滚动条时直接显示100%
+      progressPercentage.value = 100
+    }
+    
+    // 保存滚动位置
+    if (currentCategoryId.value) {
+      localStorage.setItem(`scroll_${currentCategoryId.value}`, scrollTop)
+    }
   }
 }
 
@@ -705,13 +733,17 @@ onMounted(async () => {
   
   // 添加事件监听
   window.addEventListener('keydown', handleKeydown)
-  window.addEventListener('scroll', handleScroll)
+  if (contentDisplayRef.value) {
+    contentDisplayRef.value.addEventListener('scroll', handleScroll)
+  }
 })
 
 // 清理事件监听
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
-  window.removeEventListener('scroll', handleScroll)
+  if (contentDisplayRef.value) {
+    contentDisplayRef.value.removeEventListener('scroll', handleScroll)
+  }
 })
 </script>
 
@@ -1119,6 +1151,37 @@ onUnmounted(() => {
   border: 1px solid #e9ecef;
   border-radius: 8px;
   overflow: hidden;
+}
+
+.office-preview-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  min-height: 400px;
+}
+
+.office-icon {
+  color: #8DC149;
+  margin-bottom: 20px;
+}
+
+.office-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 10px 0;
+  text-align: center;
+  word-break: break-all;
+  max-width: 100%;
+}
+
+.office-tip {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 30px;
 }
 
 .preview-image {

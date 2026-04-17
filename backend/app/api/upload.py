@@ -202,9 +202,18 @@ def download_file(file_id: int):
                     else:
                         media_type = 'application/octet-stream'
                 
-                # 为 PDF 文件设置 Content-Disposition 为 inline，使其在浏览器中显示而不是下载
+                # 为 PDF 和 Office 文件设置 Content-Disposition 为 inline，使其在浏览器中显示而不是下载
                 from fastapi.responses import FileResponse
                 if extension == '.pdf':
+                    return FileResponse(
+                        path=file_path,
+                        filename=file_name,
+                        media_type=media_type,
+                        headers={
+                            'Content-Disposition': f'inline; filename="{file_name}"'
+                        }
+                    )
+                elif extension in ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']:
                     return FileResponse(
                         path=file_path,
                         filename=file_name,

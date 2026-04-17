@@ -156,9 +156,11 @@
               :http-request="customUpload"
               :on-success="handleUploadSuccess"
               :on-error="handleUploadError"
+              :before-upload="handleBeforeUpload"
               :limit="5"
               :file-list="fileList"
               multiple
+              accept=""
             >
               <el-button type="primary" class="upload-button">
                 <el-icon><Upload /></el-icon>
@@ -166,7 +168,7 @@
               </el-button>
               <template #tip>
                 <div class="upload-tip">
-                  支持上传多种文件格式，单次最多上传5个文件
+                  支持上传多种文件格式（Word、Excel、PPT请转换为PDF后上传），单次最多上传5个文件
                 </div>
               </template>
             </el-upload>
@@ -613,6 +615,23 @@ const pageTitle = computed(() => {
       return '管理员控制台'
   }
 })
+
+// Office 文件类型检查
+const OFFICE_EXTENSIONS = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']
+
+const isOfficeFile = (fileName) => {
+  if (!fileName) return false
+  const extension = fileName.split('.').pop().toLowerCase()
+  return OFFICE_EXTENSIONS.includes(extension)
+}
+
+const handleBeforeUpload = (file) => {
+  if (isOfficeFile(file.name)) {
+    ElMessage.warning('Word、Excel、PPT 文件请转换为 PDF 后再上传')
+    return false // 阻止上传
+  }
+  return true // 允许上传
+}
 
 // 文件上传相关方法
 const customUpload = async (options) => {
