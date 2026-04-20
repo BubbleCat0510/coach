@@ -484,14 +484,6 @@ const isOfficeFile = (file) => {
   return ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(extension)
 }
 
-// 获取Office文件预览URL
-const getOfficePreviewUrl = (file) => {
-  // 在开发环境下，由于Office Online无法访问localhost，直接返回下载链接
-  // 生产环境可以使用Office Online预览
-  const fileUrl = `http://localhost:8001/upload/download/${file.id}`
-  return fileUrl
-}
-
 const zoomIn = () => {
   if (zoomLevel.value < 200) {
     zoomLevel.value += 10
