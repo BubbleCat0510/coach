@@ -305,3 +305,211 @@ def delete_file(file_id: int = Body(..., embed=True), current_user: dict = Depen
             "success": False,
             "message": f"文件删除失败: {str(e)}"
         }
+
+
+@router.post("/progress")
+def update_progress(file_id: int = Body(..., embed=True), progress: int = Body(..., embed=True), learning_time: int = Body(0, embed=True), current_user: dict = Depends(get_current_user)):
+    """更新用户文件学习进度"""
+    try:
+        user_id = current_user.get("user_id")
+        
+        # 打印接收到的参数
+        print(f"=== 更新进度参数 ===")
+        print(f"user_id: {user_id}")
+        print(f"file_id: {file_id}")
+        print(f"progress: {progress}")
+        print(f"learning_time: {learning_time}")
+        
+        # 验证参数
+        if progress < 0:
+            progress = 0
+        elif progress > 100:
+            progress = 100
+        
+        is_completed = 1 if progress >= 100 else 0
+        
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                # 检查是否已存在记录
+                cursor.execute(
+                    """
+                    SELECT id, total_learning_time FROM coach_user_file_progress 
+                    WHERE user_id = %s AND file_id = %s
+                    """,
+                    (user_id, file_id)
+                )
+                existing = cursor.fetchone()
+                
+                print(f"existing record: {existing}")
+                
+                if existing:
+                    # 更新进度和学习时间（直接使用前端传递的学习时间）
+                    total_time = learning_time
+                    print(f"更新记录 - total_time: {total_time}")
+                    cursor.execute(
+                        """
+                        UPDATE coach_user_file_progress 
+                        SET progress = %s, is_completed = %s, last_read_time = CURRENT_TIMESTAMP, total_learning_time = %s
+                        WHERE user_id = %s AND file_id = %s
+                        """,
+                        (progress, is_completed, total_time, user_id, file_id)
+                    )
+                else:
+                    # 插入新记录
+                    total_time = learning_time
+                    print(f"插入新记录 - learning_time: {learning_time}")
+                    cursor.execute(
+                        """
+                        INSERT INTO coach_user_file_progress (user_id, file_id, progress, is_completed, total_learning_time)
+                        VALUES (%s, %s, %s, %s, %s)
+                        """,
+                        (user_id, file_id, progress, is_completed, total_time)
+                    )
+                conn.commit()
+        
+        result = {
+            "success": True,
+            "message": "进度更新成功",
+            "progress": progress,
+            "is_completed": is_completed,
+            "learning_time": total_time if existing else learning_time
+        }
+        print(f"返回结果：{result}")
+        print(f"===================\n")
+        
+        return result
+    except Exception as e:
+        print(f"异常：{str(e)}")
+        return {
+            "success": False,
+            "message": f"进度更新失败: {str(e)}"
+        }
+
+
+@router.get("/progress/{file_id}")
+def get_progress(file_id: int, current_user: dict = Depends(get_current_user)):
+    """获取用户文件学习进度"""
+    try:
+        user_id = current_user.get("user_id")
+        
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT progress, is_completed, last_read_time, total_learning_time 
+                    FROM coach_user_file_progress 
+                    WHERE user_id = %s AND file_id = %s
+                    """,
+                    (user_id, file_id)
+                )
+                result = cursor.fetchone()
+                
+                if result:
+                    return {
+                        "success": True,
+                        "progress": result["progress"],
+                        "is_completed": result["is_completed"],
+                        "last_read_time": result["last_read_time"].strftime("%Y-%m-%d %H:%M:%S") if result["last_read_time"] else None,
+                        "learning_time": result["total_learning_time"]
+                    }
+                else:
+                    return {
+                        "success": True,
+                        "progress": 0,
+                        "is_completed": 0,
+                        "last_read_time": None,
+                        "learning_time": 0
+                    }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"获取进度失败: {str(e)}"
+        }
+
+
+@router.get("/learning-status")
+def get_learning_status(page: int = 1, pageSize: int = 10, search: str = "", current_user: dict = Depends(get_current_user)):
+    """获取所有用户的学习情况（管理员用）"""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                # 构建查询条件
+                where_clause = ""
+                params = []
+
+                if search:
+                    where_clause = "WHERE coach_user.username LIKE %s OR coach_file_upload.file_name LIKE %s"
+                    params.extend([f"%{search}%", f"%{search}%"])
+
+                # 查询总记录数
+                cursor.execute(
+                    f"""
+                    SELECT COUNT(*) as total
+                    FROM coach_user_file_progress
+                    LEFT JOIN coach_user ON coach_user_file_progress.user_id = coach_user.id
+                    LEFT JOIN coach_file_upload ON coach_user_file_progress.file_id = coach_file_upload.id
+                    {where_clause}
+                    """,
+                    params
+                )
+                total_result = cursor.fetchone()
+                total = total_result["total"] if total_result else 0
+
+                # 计算偏移量
+                offset = (page - 1) * pageSize
+
+                # 查询分页数据
+                query_params = params + [pageSize, offset]
+                cursor.execute(
+                    f"""
+                    SELECT
+                        coach_user_file_progress.id,
+                        coach_user.id as user_id,
+                        coach_user.username,
+                        coach_user.nickname,
+                        coach_file_upload.id as file_id,
+                        coach_file_upload.file_name as file_name,
+                        coach_file_upload.file_type as file_type,
+                        coach_user_file_progress.progress,
+                        coach_user_file_progress.is_completed,
+                        coach_user_file_progress.last_read_time,
+                        coach_user_file_progress.total_learning_time
+                    FROM coach_user_file_progress
+                    LEFT JOIN coach_user ON coach_user_file_progress.user_id = coach_user.id
+                    LEFT JOIN coach_file_upload ON coach_user_file_progress.file_id = coach_file_upload.id
+                    {where_clause}
+                    ORDER BY coach_user_file_progress.last_read_time DESC
+                    LIMIT %s OFFSET %s
+                    """,
+                    query_params
+                )
+                records = cursor.fetchall()
+
+        # 转换为字典列表
+        record_list = []
+        for record in records:
+            record_dict = {
+                "id": record["id"],
+                "userId": record["user_id"],
+                "username": record["username"],
+                "nickname": record["nickname"],
+                "fileId": record["file_id"],
+                "fileName": record["file_name"],
+                "fileType": record["file_type"],
+                "progress": record["progress"],
+                "isCompleted": record["is_completed"],
+                "lastReadTime": record["last_read_time"].strftime("%Y-%m-%d %H:%M:%S") if record["last_read_time"] else None,
+                "learningTime": record["total_learning_time"]
+            }
+            record_list.append(record_dict)
+
+        return {
+            "success": True,
+            "records": record_list,
+            "total": total
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"获取学习情况失败: {str(e)}"
+        }

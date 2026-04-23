@@ -91,17 +91,11 @@
             </el-button>
           </div>
 
-          <!-- 收藏按钮 -->
-          <el-button
-                    :type="isFavorited ? 'primary' : 'default'"
-                    link
-                    size="small"
-                    @click="toggleFavorite"
-                  >
-            <el-icon v-if="isFavorited"><StarFilled /></el-icon>
-            <el-icon v-else><Star /></el-icon>
-            <span v-if="!sidebarCollapsed">收藏</span>
-          </el-button>
+          <!-- 学习时间 -->
+          <div class="learning-time" v-if="!sidebarCollapsed">
+            <el-icon><Timer /></el-icon>
+            <span>学习时间：{{ formatLearningTime(currentLearningTime) }}</span>
+          </div>
         </div>
       </div>
 
@@ -266,14 +260,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { 
-  House, ArrowLeft, ArrowRight, Star, StarFilled, 
-  Plus, Minus, Expand, Fold, Document, Picture, VideoCamera, Download 
+  House, ArrowLeft, ArrowRight, 
+  Plus, Minus, Expand, Fold, Document, Download, Timer 
 } from '@element-plus/icons-vue'
-import { getFileList } from '@/api/upload'
+import { getFileList, getProgress, updateProgress } from '@/api/upload'
 import axios from 'axios'
 
 const router = useRouter()
@@ -294,6 +288,19 @@ const loadingFiles = ref(false)
 const zoomLevel = ref(100)
 const isFavorited = ref(false)
 const progressPercentage = ref(0)
+
+// 学习时间相关状态
+const learningTimes = ref({}) // 存储每个文件的学习时间，格式：{ fileId: seconds }
+const currentLearningTime = ref(0) // 当前文件的学习时间
+const timer = ref(null)
+
+// 格式化学习时间
+const formatLearningTime = (seconds) => {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+}
 
 // 文件内容预览相关状态
 const fileContent = ref('')
@@ -370,6 +377,8 @@ const backToDashboard = () => {
 }
 
 const handleCategoryClick = (data) => {
+  // 切换文件
+  switchFile(data.id)
   currentCategoryId.value = data.id
   loadContent(data.id)
   // 保存当前分类
@@ -406,6 +415,19 @@ const loadContent = async (categoryId) => {
       
       // 初始进度设置
       progressPercentage.value = 0
+      
+      // 获取学习进度
+      await loadProgress(file.id)
+      
+      // 更新当前学习时间
+      if (learningTimes.value[file.id]) {
+        currentLearningTime.value = learningTimes.value[file.id]
+      } else {
+        currentLearningTime.value = 0
+      }
+      
+      // 开始计时
+      startTimer()
       
       // 模拟上下篇
       const fileIndex = files.value.findIndex(f => f.id === categoryId)
@@ -590,8 +612,8 @@ const previousContent = () => {
     const fileIndex = files.value.findIndex(f => f.id === currentCategoryId.value)
     if (fileIndex > 0) {
       const prevFile = files.value[fileIndex - 1]
-      currentCategoryId.value = prevFile.id
-      loadContent(prevFile.id)
+      // 切换文件，会自动处理学习时间的保存和切换
+      handleCategoryClick({ id: prevFile.id, file: prevFile })
     }
   }
 }
@@ -601,8 +623,8 @@ const nextContent = () => {
     const fileIndex = files.value.findIndex(f => f.id === currentCategoryId.value)
     if (fileIndex < files.value.length - 1) {
       const nextFile = files.value[fileIndex + 1]
-      currentCategoryId.value = nextFile.id
-      loadContent(nextFile.id)
+      // 切换文件，会自动处理学习时间的保存和切换
+      handleCategoryClick({ id: nextFile.id, file: nextFile })
     }
   }
 }
@@ -644,26 +666,111 @@ const handleKeydown = (event) => {
   }
 }
 
+// 加载学习进度
+const loadProgress = async (fileId) => {
+  try {
+    const response = await getProgress(fileId)
+    if (response && response.success) {
+      progressPercentage.value = response.progress
+      if (response.learning_time) {
+        learningTimes.value[fileId] = response.learning_time
+        if (fileId === currentCategoryId.value) {
+          currentLearningTime.value = response.learning_time
+        }
+      }
+    }
+  } catch (error) {
+    console.error('获取学习进度失败:', error)
+  }
+}
+
+// 保存学习进度
+const saveProgress = async (fileId, progress) => {
+  try {
+    const currentTime = currentLearningTime.value
+    console.log('保存学习进度 - 参数:', {
+      fileId,
+      progress,
+      currentLearningTime: currentTime
+    })
+    const response = await updateProgress(fileId, progress, currentTime)
+    console.log('保存学习进度 - 后端返回:', response)
+  } catch (error) {
+    console.error('保存学习进度失败:', error)
+  }
+}
+
+// 开始计时
+const startTimer = () => {
+  if (!timer.value && currentCategoryId.value) {
+    timer.value = setInterval(() => {
+      currentLearningTime.value++
+    }, 1000)
+  }
+}
+
+// 停止计时
+const stopTimer = () => {
+  if (timer.value && currentCategoryId.value) {
+    clearInterval(timer.value)
+    timer.value = null
+    // 保存当前文件的学习时间
+    learningTimes.value[currentCategoryId.value] = currentLearningTime.value
+  }
+}
+
+// 处理页面可见性变化
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    stopTimer()
+  } else {
+    startTimer()
+  }
+}
+
+// 切换文件时的处理
+const switchFile = (newFileId) => {
+  // 停止当前文件的计时并保存学习时间
+  if (currentCategoryId.value) {
+    stopTimer()
+    saveProgress(currentCategoryId.value, progressPercentage.value)
+  }
+  
+  // 加载新文件的学习时间
+  if (learningTimes.value[newFileId]) {
+    currentLearningTime.value = learningTimes.value[newFileId]
+  } else {
+    currentLearningTime.value = 0
+  }
+  
+  // 开始新文件的计时
+  startTimer()
+}
+
 // 滚动事件，记录阅读进度
 const contentDisplayRef = ref(null)
 
 const handleScroll = () => {
-  if (contentDisplayRef.value) {
+  if (contentDisplayRef.value && currentCategoryId.value) {
     const scrollTop = contentDisplayRef.value.scrollTop
     const scrollHeight = contentDisplayRef.value.scrollHeight
     const clientHeight = contentDisplayRef.value.clientHeight
     const docHeight = scrollHeight - clientHeight
     
     if (docHeight > 0) {
-      const progress = Math.round((scrollTop / docHeight) * 100)
-      // 只有当当前进度小于100%时才更新
-      if (progressPercentage.value < 100) {
-        progressPercentage.value = progress
+        const progress = Math.round((scrollTop / docHeight) * 100)
+        // 只有当当前进度小于100%时才更新
+        if (progressPercentage.value < 100) {
+          progressPercentage.value = progress
+          // 保存进度和学习时间
+          saveProgress(currentCategoryId.value, progress)
+        }
+      } else {
+        // 没有滚动条时直接显示100%
+        progressPercentage.value = 100
+        // 保存进度和学习时间
+        saveProgress(currentCategoryId.value, 100)
       }
-    } else {
-      // 没有滚动条时直接显示100%
-      progressPercentage.value = 100
-    }
     
     // 保存滚动位置
     if (currentCategoryId.value) {
@@ -723,19 +830,32 @@ onMounted(async () => {
     loadContent(currentCategoryId.value)
   }
   
+  // 只有当没有选中文件时才开始计时（避免重复计时）
+  if (!currentCategoryId.value) {
+    startTimer()
+  }
+  
   // 添加事件监听
   window.addEventListener('keydown', handleKeydown)
   if (contentDisplayRef.value) {
     contentDisplayRef.value.addEventListener('scroll', handleScroll)
   }
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 // 清理事件监听
 onUnmounted(() => {
+  // 停止计时并保存学习时间
+  stopTimer()
+  if (currentCategoryId.value) {
+    saveProgress(currentCategoryId.value, progressPercentage.value)
+  }
+  
   window.removeEventListener('keydown', handleKeydown)
   if (contentDisplayRef.value) {
     contentDisplayRef.value.removeEventListener('scroll', handleScroll)
   }
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 
@@ -1041,6 +1161,23 @@ onUnmounted(() => {
 
 .toolbar :deep(.el-button:hover) {
   background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.learning-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.learning-time .el-icon {
+  font-size: 16px;
+  color: #98FB98;
 }
 
 .content-display {
