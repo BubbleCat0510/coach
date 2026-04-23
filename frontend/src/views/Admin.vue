@@ -11,7 +11,7 @@
         <div 
           class="menu-item" 
           :class="{ active: activeMenu === 'user' }"
-          @click="activeMenu = 'user'; showUserManagement = true; showFileUpload = false"
+          @click="activeMenu = 'user'; showUserManagement = true; showFileUpload = false; showLearningStatus = false"
         >
           <el-icon class="menu-icon"><User /></el-icon>
           <span class="menu-text">用户管理</span>
@@ -19,10 +19,18 @@
         <div 
           class="menu-item" 
           :class="{ active: activeMenu === 'file' }"
-          @click="activeMenu = 'file'; showFileUpload = true; showUserManagement = false"
+          @click="activeMenu = 'file'; showFileUpload = true; showUserManagement = false; showLearningStatus = false"
         >
           <el-icon class="menu-icon"><Upload /></el-icon>
           <span class="menu-text">文件上传</span>
+        </div>
+        <div 
+          class="menu-item" 
+          :class="{ active: activeMenu === 'learning' }"
+          @click="activeMenu = 'learning'; showLearningStatus = true; showUserManagement = false; showFileUpload = false"
+        >
+          <el-icon class="menu-icon"><Document /></el-icon>
+          <span class="menu-text">学习情况</span>
         </div>
       </div>
       
@@ -151,36 +159,40 @@
           </template>
 
           <div class="upload-container">
-            <el-upload
-              class="upload-demo"
-              :http-request="customUpload"
-              :on-success="handleUploadSuccess"
-              :on-error="handleUploadError"
-              :before-upload="handleBeforeUpload"
-              :limit="5"
-              :file-list="fileList"
-              multiple
-              accept=""
-            >
-              <el-button type="primary" class="upload-button">
-                <el-icon><Upload /></el-icon>
-                选择文件
-              </el-button>
-              <template #tip>
-                <div class="upload-tip">
-                  支持上传多种文件格式（Word、Excel、PPT请转换为PDF后上传），单次最多上传5个文件
-                </div>
-              </template>
-            </el-upload>
-
-            <!-- 搜索 -->
-            <div class="search-filter" style="margin: 15px 0;">
-              <el-input
-                v-model="fileSearchQuery"
-                placeholder="搜索用户"
-                prefix-icon="Search"
-                class="search-input"
-              />
+            <div class="upload-header">
+              <div class="upload-section">
+                <el-upload
+                  class="upload-demo"
+                  :http-request="customUpload"
+                  :on-success="handleUploadSuccess"
+                  :on-error="handleUploadError"
+                  :before-upload="handleBeforeUpload"
+                  :limit="5"
+                  :file-list="fileList"
+                  multiple
+                  accept=""
+                >
+                  <el-button type="primary" class="upload-button">
+                    <el-icon><Upload /></el-icon>
+                    选择文件
+                  </el-button>
+                  <template #tip>
+                    <div class="upload-tip">
+                      支持上传多种文件格式（Word、Excel、PPT请转换为PDF后上传），单次最多上传5个文件
+                    </div>
+                  </template>
+                </el-upload>
+              </div>
+              
+              <!-- 搜索 -->
+              <div class="search-section">
+                <el-input
+                  v-model="fileSearchQuery"
+                  placeholder="搜索用户"
+                  prefix-icon="Search"
+                  class="search-input"
+                />
+              </div>
             </div>
 
             <!-- 上传历史记录 -->
@@ -197,7 +209,7 @@
               >
                 <el-table-column prop="id" label="ID" width="80" />
                 <el-table-column prop="username" label="上传用户" width="150" />
-                <el-table-column prop="name" label="文件名" />
+                <el-table-column prop="name" label="文件名" show-overflow-tooltip />
                 <el-table-column prop="size" label="大小" width="120">
                   <template #default="scope">
                     {{ formatFileSize(scope.row.size) }}
@@ -254,6 +266,80 @@
             </div>
           </div>
         </el-card>
+
+        <!-- 学习情况模块 -->
+        <el-card v-if="showLearningStatus" class="file-upload-card">
+          <template #header>
+            <div class="card-header">
+              <span class="header-title">学习情况</span>
+            </div>
+          </template>
+
+          <div class="learning-container">
+            <!-- 搜索 -->
+            <div class="search-filter">
+              <el-input
+                v-model="learningSearchQuery"
+                placeholder="搜索用户或文件名"
+                prefix-icon="Search"
+                class="search-input"
+                @input="loadLearningStatus"
+              />
+            </div>
+
+            <!-- 学习情况记录 -->
+            <div class="learning-status">
+              <h3 class="history-title">用户学习进度</h3>
+              <el-table 
+                :data="learningStatus"
+                style="width: 100%"
+                class="history-table"
+                v-loading="loadingLearning"
+                element-loading-text="加载中..."
+                element-loading-spinner="el-icon-loading"
+                element-loading-background="rgba(255, 255, 255, 0.8)"
+              >
+                <el-table-column prop="userId" label="用户ID" width="100" />
+                <el-table-column prop="username" label="用户名" width="150" />
+                <el-table-column prop="nickname" label="昵称" width="150" />
+                <el-table-column prop="fileId" label="文件ID" width="100" />
+                <el-table-column prop="fileName" label="文件名" show-overflow-tooltip />
+                <el-table-column prop="fileType" label="文件类型" width="120">
+                  <template #default="scope">
+                    {{ formatFileType(scope.row.fileType) }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="progress" label="学习进度" width="120" align="center" header-align="center">
+                  <template #default="scope">
+                    <el-progress :percentage="scope.row.progress" :color="scope.row.progress >= 100 ? '#67c23a' : ''" />
+                  </template>
+                </el-table-column>
+                <el-table-column prop="isCompleted" label="是否完成" width="100" align="center" header-align="center">
+                  <template #default="scope">
+                    <el-tag :type="scope.row.isCompleted ? 'success' : 'info'">
+                      {{ scope.row.isCompleted ? '已完成' : '进行中' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="lastReadTime" label="最后阅读时间" width="180" />
+              </el-table>
+
+              <!-- 分页 -->
+              <div class="file-pagination" v-if="!loadingLearning && totalLearning > 0">
+                <el-pagination
+                  v-model:current-page="currentLearningPage"
+                  v-model:page-size="learningPageSize"
+                  :page-sizes="[10, 20, 50, 100]"
+                  layout="total, sizes, prev, pager, next, jumper"
+                  :total="totalLearning"
+                  @size-change="handleLearningSizeChange"
+                  @current-change="handleLearningCurrentChange"
+                  style="float: right"
+                />
+              </div>
+            </div>
+          </div>
+        </el-card>
       </div>
     </div>
 
@@ -298,19 +384,20 @@
 import { ref, computed, reactive, onMounted, watch } from 'vue'
 import {
   User, Management, ArrowDown, SwitchButton,
-  Plus, Search, Edit, Delete, Upload, Download
+  Plus, Edit, Delete, Upload, Download
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { getUserList, getNickname, createUser, updateUser, deleteUser as deleteUserApi } from '@/api/user'
-import { uploadFile, getFileList, deleteFile as deleteFileApi } from '@/api/upload'
+import { uploadFile, getFileList, deleteFile as deleteFileApi, getLearningStatus } from '@/api/upload'
 
 const router = useRouter()
 
 // 状态管理
 const showUserManagement = ref(true)
 const showFileUpload = ref(false)
+const showLearningStatus = ref(false)
 const searchQuery = ref('')
 const roleFilter = ref('')
 const currentPage = ref(1)
@@ -331,6 +418,14 @@ const currentFilePage = ref(1)
 const filePageSize = ref(10)
 const totalFiles = ref(0)
 const fileSearchQuery = ref('')
+
+// 学习情况相关状态
+const learningStatus = ref([])
+const loadingLearning = ref(false)
+const currentLearningPage = ref(1)
+const learningPageSize = ref(10)
+const totalLearning = ref(0)
+const learningSearchQuery = ref('')
 
 // 用户数据
 const users = ref([])
@@ -377,7 +472,7 @@ const loadFiles = async () => {
         console.log(`文件 ${index + 1} 数据:`, file)
         console.log(`文件 ${index + 1} username:`, file.username)
       })
-      uploadHistory.value = response.files
+      uploadHistory.value = response.files.sort((a, b) => b.id - a.id)
       totalFiles.value = response.total || 0
     } else {
       console.error('获取文件列表失败，响应格式不正确:', response)
@@ -413,6 +508,47 @@ watch(fileSearchQuery, debounce(() => {
   loadFiles()
 }, 300))
 
+// 监听学习情况搜索框变化
+watch(learningSearchQuery, debounce(() => {
+  currentLearningPage.value = 1
+  loadLearningStatus()
+}, 300))
+
+// 加载学习情况
+const loadLearningStatus = async () => {
+  try {
+    loadingLearning.value = true
+    console.log('开始获取学习情况')
+    const response = await getLearningStatus(currentLearningPage.value, learningPageSize.value, learningSearchQuery.value)
+    console.log('获取学习情况响应:', response)
+    if (response && response.success) {
+      console.log('学习情况数据:', response.records)
+      learningStatus.value = response.records
+      totalLearning.value = response.total || 0
+    } else {
+      console.error('获取学习情况失败，响应格式不正确:', response)
+    }
+  } catch (error) {
+    console.error('获取学习情况失败:', error)
+    ElMessage.error('获取学习情况失败')
+  } finally {
+    loadingLearning.value = false
+  }
+}
+
+// 处理学习情况分页大小变化
+const handleLearningSizeChange = (size) => {
+  learningPageSize.value = size
+  currentLearningPage.value = 1
+  loadLearningStatus()
+}
+
+// 处理学习情况分页页码变化
+const handleLearningCurrentChange = (current) => {
+  currentLearningPage.value = current
+  loadLearningStatus()
+}
+
 // 页面挂载时加载数据
 onMounted(() => {
   // 检查是否有token
@@ -424,6 +560,7 @@ onMounted(() => {
   }
   loadUsers()
   loadFiles()
+  loadLearningStatus()
 })
 
 // 表单数据
@@ -611,6 +748,8 @@ const pageTitle = computed(() => {
       return '用户管理'
     case 'file':
       return '文件上传'
+    case 'learning':
+      return '学习情况'
     default:
       return '管理员控制台'
   }
@@ -1171,7 +1310,26 @@ const getRoleType = (role) => {
 }
 
 .upload-container {
-  padding: 24px;
+  padding: 0 24px;
+}
+
+.upload-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.upload-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-section {
+  flex-shrink: 0;
+}
+
+.learning-container {
+  padding: 24px 24px 16px;
 }
 
 .upload-button {
@@ -1185,19 +1343,21 @@ const getRoleType = (role) => {
 }
 
 .upload-history {
-  margin-top: 40px;
+  margin-top: 10px;
 }
 
 .history-title {
   font-size: 16px;
   font-weight: 600;
   color: #333;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .history-table {
   border-radius: 8px;
   overflow: hidden;
+  min-height: 350px;
+  height: auto;
 }
 
 /* 表格样式美化 */
