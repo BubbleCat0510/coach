@@ -299,16 +299,11 @@
                 element-loading-spinner="el-icon-loading"
                 element-loading-background="rgba(255, 255, 255, 0.8)"
               >
-                <el-table-column prop="userId" label="用户ID" width="100" />
-                <el-table-column prop="username" label="用户名" width="150" />
+                <el-table-column prop="userId" label="用户ID" width="80" />
+                <el-table-column prop="username" label="用户名" width="80" />
                 <el-table-column prop="nickname" label="昵称" width="150" />
                 <el-table-column prop="fileId" label="文件ID" width="100" />
                 <el-table-column prop="fileName" label="文件名" show-overflow-tooltip />
-                <el-table-column prop="fileType" label="文件类型" width="120">
-                  <template #default="scope">
-                    {{ formatFileType(scope.row.fileType) }}
-                  </template>
-                </el-table-column>
                 <el-table-column prop="progress" label="学习进度" width="120" align="center" header-align="center">
                   <template #default="scope">
                     <el-progress :percentage="scope.row.progress" :color="scope.row.progress >= 100 ? '#67c23a' : ''" />
@@ -319,6 +314,11 @@
                     <el-tag :type="scope.row.isCompleted ? 'success' : 'info'">
                       {{ scope.row.isCompleted ? '已完成' : '进行中' }}
                     </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="learningTime" label="学习时长" width="120" align="center" header-align="center">
+                  <template #default="scope">
+                    {{ formatLearningTime(scope.row.learningTime) }}
                   </template>
                 </el-table-column>
                 <el-table-column prop="lastReadTime" label="最后阅读时间" width="180" />
@@ -840,6 +840,28 @@ const formatFileType = (type) => {
   }
   
   return typeMap[type] || type
+}
+
+// 格式化学习时长
+const formatLearningTime = (seconds) => {
+  if (!seconds || seconds === 0) return '0秒'
+  
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+  
+  let result = ''
+  if (hours > 0) {
+    result += `${hours}小时`
+  }
+  if (minutes > 0) {
+    result += `${minutes}分`
+  }
+  if (secs > 0 && hours === 0) {
+    result += `${secs}秒`
+  }
+  
+  return result || '0秒'
 }
 
 const downloadFile = async (file) => {
