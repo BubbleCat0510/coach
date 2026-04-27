@@ -8,6 +8,9 @@ import Train from '../views/Train.vue'
 import Exam from '../views/Exam.vue'
 import TrainingContent from '../views/TrainingContent.vue'
 import Admin from '../views/Admin.vue'
+import UserManagement from '../views/UserManagement.vue'
+import FileUpload from '../views/FileUpload.vue'
+import LearningStatus from '../views/LearningStatus.vue'
 import Profile from '../views/Profile.vue'
 
 // 定义路由规则
@@ -50,8 +53,29 @@ const routes = [
   // 管理员页面
   {
     path: '/admin',
-    name: 'Admin',
-    component: Admin
+    component: Admin,
+    children: [
+      {
+        path: 'user',
+        name: 'UserManagement',
+        component: UserManagement
+      },
+      {
+        path: 'file',
+        name: 'FileUpload',
+        component: FileUpload
+      },
+      {
+        path: 'learning',
+        name: 'LearningStatus',
+        component: LearningStatus
+      },
+      {
+        path: '',
+        name: 'Admin',
+        redirect: '/admin/user'
+      }
+    ]
   },
   // 个人中心页面
   {
