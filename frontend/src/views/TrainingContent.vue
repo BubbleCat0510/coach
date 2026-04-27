@@ -471,12 +471,17 @@ const loadTextFileContent = async (fileId) => {
     const response = await axios({
       url: `http://localhost:8001/upload/download/${fileId}`,
       method: 'GET',
-      responseType: 'text',
+      responseType: 'json',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
     })
-    fileContent.value = response.data
+    if (response.data.success) {
+      fileContent.value = response.data.content
+    } else {
+      console.error('加载文件内容失败:', response.data.message)
+      fileContent.value = ''
+    }
   } catch (error) {
     console.error('加载文件内容失败:', error)
     fileContent.value = ''

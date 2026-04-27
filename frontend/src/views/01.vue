@@ -31,7 +31,6 @@
 						class="action-btn secondary"
 					>
 						<el-icon><DataAnalysis /></el-icon>
-						历史成绩
 					</el-button>
 					<el-button
 						size="large"
