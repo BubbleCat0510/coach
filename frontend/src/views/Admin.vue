@@ -64,6 +64,8 @@ onMounted(() => {
     activeMenu.value = 'file'
   } else if (currentPath.includes('/admin/learning')) {
     activeMenu.value = 'learning'
+  } else if (currentPath.includes('/admin/question')) {
+    activeMenu.value = 'question'
   }
 })
 
@@ -81,6 +83,8 @@ const pageTitle = computed(() => {
       return '文件上传'
     case 'learning':
       return '学习情况'
+    case 'question':
+      return '题库管理'
     default:
       return '管理员控制台'
   }
@@ -98,6 +102,9 @@ const handleMenuChange = (menu) => {
       break
     case 'learning':
       router.push('/admin/learning')
+      break
+    case 'question':
+      router.push('/admin/question')
       break
   }
 }

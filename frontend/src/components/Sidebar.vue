@@ -30,6 +30,14 @@
         <el-icon class="menu-icon"><Document /></el-icon>
         <span class="menu-text">学习情况</span>
       </div>
+      <div 
+        class="menu-item" 
+        :class="{ active: activeMenu === 'question' }"
+        @click="handleMenuClick('question')"
+      >
+        <el-icon class="menu-icon"><HelpFilled /></el-icon>
+        <span class="menu-text">题库管理</span>
+      </div>
     </div>
     
     <div class="sidebar-footer">
@@ -50,7 +58,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { Management, User, Upload, Document, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
+import { Management, User, Upload, Document, HelpFilled, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
 
 // Props
 const props = defineProps({
