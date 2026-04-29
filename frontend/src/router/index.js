@@ -11,6 +11,7 @@ import Admin from '../views/Admin.vue'
 import UserManagement from '../views/UserManagement.vue'
 import FileUpload from '../views/FileUpload.vue'
 import LearningStatus from '../views/LearningStatus.vue'
+import QuestionBank from '../views/QuestionBank.vue'
 import Profile from '../views/Profile.vue'
 
 // 定义路由规则
@@ -69,6 +70,11 @@ const routes = [
         path: 'learning',
         name: 'LearningStatus',
         component: LearningStatus
+      },
+      {
+        path: 'question',
+        name: 'QuestionBank',
+        component: QuestionBank
       },
       {
         path: '',

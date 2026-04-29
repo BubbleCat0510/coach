@@ -13,7 +13,7 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/file")
-def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+def upload_file(file: UploadFile = File(...), category: str = Body("other"), current_user: dict = Depends(get_current_user)):
     try:
         # 生成唯一的文件名
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -34,10 +34,10 @@ def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_c
             with conn.cursor() as cursor:
                 cursor.execute(
                     """
-                    INSERT INTO coach_file_upload (user_id, file_name, file_path, file_size, file_type, file_hash)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    INSERT INTO coach_file_upload (user_id, file_name, file_path, file_size, file_type, category, file_hash)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """,
-                    (user_id, file.filename, file_path, len(content), file.content_type, file_hash)
+                    (user_id, file.filename, file_path, len(content), file.content_type, category, file_hash)
                 )
                 conn.commit()
 
@@ -94,6 +94,7 @@ def get_file_list(page: int = 1, pageSize: int = 10, search: str = "", current_u
                         coach_file_upload.file_path,
                         coach_file_upload.file_size as size,
                         coach_file_upload.file_type as type,
+                        coach_file_upload.category,
                         coach_file_upload.create_time as uploadTime
                     FROM coach_file_upload
                     LEFT JOIN coach_user ON coach_file_upload.user_id = coach_user.id
@@ -116,6 +117,7 @@ def get_file_list(page: int = 1, pageSize: int = 10, search: str = "", current_u
                 "path": file["file_path"],
                 "size": file["size"],
                 "type": file["type"],
+                "category": file["category"],
                 "uploadTime": file["uploadTime"].strftime("%Y-%m-%d %H:%M:%S") if file["uploadTime"] else None
             }
             file_list.append(file_dict)
@@ -204,29 +206,42 @@ def download_file(file_id: int):
                 
                 # 为 PDF 和 Office 文件设置 Content-Disposition 为 inline，使其在浏览器中显示而不是下载
                 from fastapi.responses import FileResponse
-                if extension == '.pdf':
+                import urllib.parse
+                
+                # 对文件名进行URL编码，处理非ASCII字符
+                encoded_filename = urllib.parse.quote(file_name)
+                
+                # 对于文本文件，直接返回文本内容
+                if extension in ['.txt', '.md', '.html', '.css', '.js', '.json', '.xml', '.csv', '.log']:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    return {
+                        "success": True,
+                        "content": content
+                    }
+                elif extension == '.pdf':
                     return FileResponse(
                         path=file_path,
-                        filename=file_name,
                         media_type=media_type,
                         headers={
-                            'Content-Disposition': f'inline; filename="{file_name}"'
+                            'Content-Disposition': f'inline; filename*=UTF-8''{encoded_filename}'''
                         }
                     )
                 elif extension in ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']:
                     return FileResponse(
                         path=file_path,
-                        filename=file_name,
                         media_type=media_type,
                         headers={
-                            'Content-Disposition': f'inline; filename="{file_name}"'
+                            'Content-Disposition': f'inline; filename*=UTF-8''{encoded_filename}'''
                         }
                     )
                 else:
                     return FileResponse(
                         path=file_path,
-                        filename=file_name,
-                        media_type=media_type
+                        media_type=media_type,
+                        headers={
+                            'Content-Disposition': f'attachment; filename*=UTF-8''{encoded_filename}'''
+                        }
                     )
     except Exception as e:
         return {

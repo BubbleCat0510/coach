@@ -1,9 +1,10 @@
 import request from './request'
 
 // 上传文件
-export function uploadFile(file) {
+export function uploadFile(file, category = 'other') {
   const formData = new FormData()
   formData.append('file', file)
+  formData.append('category', category)
   return request.post('/upload/file', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'

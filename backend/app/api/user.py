@@ -4,19 +4,6 @@ from app.core.db import get_db
 
 router = APIRouter(prefix="/user", tags=["用户"])
 
-# coach_user —— 用户表
-
-# 作用：系统用户、员工主体
-
-# 字段名	    类型	        含义
-# id	        bigint	        用户唯一 ID
-# username	    varchar(50)	    登录账号
-# password	    varchar(255)	登录密码（哈希）
-# nickname	    varchar(50)	    昵称
-# role	        varchar(20)	    岗位 / 角色
-# status	    tinyint	        状态：1 正常 / 0 禁用
-# create_time	datetime	    创建时间
-
 @router.post("/nickname")
 def get_nickname(current_user: dict = Depends(get_current_user)):
     user_id = current_user.get("user_id")

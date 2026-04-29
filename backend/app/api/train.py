@@ -7,33 +7,6 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/train", tags=["训练"])
 
-# coach_train_session —— 训练会话表
-
-# 作用：一次完整的训练过程
-
-# 字段名	    类型	        含义
-# id	        bigint	        训练会话 ID
-# user_id	    bigint	        用户 ID
-# title	        varchar(100)	训练主题
-# role_name	    varchar(50)	    AI 教练角色
-# status	    tinyint	        1 进行中 / 2 已完成
-# create_time	datetime	    创建时间
-# update_time	datetime	    更新时间
-
-# coach_train_round —— 训练轮次表
-
-# 作用：训练中的每一轮对话
-
-# 字段名	    类型	    含义
-# id	        bigint	    轮次 ID
-# session_id	bigint	    训练会话 ID
-# user_id	    bigint	    用户 ID
-# ai_question	text	    AI 提问
-# user_answer	text	    用户回答
-# ai_reply	    text	    AI 教练回复
-# score	        int	        训练评分
-# feedback	    text	    改进建议
-# create_time	datetime	创建时间
 
 class SessionCreate(BaseModel):
     role: str
