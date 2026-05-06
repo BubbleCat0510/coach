@@ -13,6 +13,9 @@ import FileUpload from '../views/FileUpload.vue'
 import LearningStatus from '../views/LearningStatus.vue'
 import QuestionBank from '../views/QuestionBank.vue'
 import Profile from '../views/Profile.vue'
+import ExamCenter from '../views/ExamCenter.vue'
+import ExamTest from '../views/ExamTest.vue'
+import MockTest from '../views/MockTest.vue'
 
 // 定义路由规则
 const routes = [
@@ -27,7 +30,7 @@ const routes = [
     name: 'Login',
     component: Login
   },
-  // 员工登录后的“工作首页 / 控制台 页面
+  // 员工登录后的"工作首页 / 控制台 页面
   {
     path: '/dashboard',
     name: 'Dashboard',
@@ -44,6 +47,24 @@ const routes = [
     path: '/ai-test',
     name: 'Exam',
     component: Exam
+  },
+  // 评估中心页面
+  {
+    path: '/exam-center',
+    name: 'ExamCenter',
+    component: ExamCenter
+  },
+  // 正式测试页面
+  {
+    path: '/exam-test',
+    name: 'ExamTest',
+    component: ExamTest
+  },
+  // 模拟测试页面
+  {
+    path: '/mock-test',
+    name: 'MockTest',
+    component: MockTest
   },
   // 培训内容页面
   {

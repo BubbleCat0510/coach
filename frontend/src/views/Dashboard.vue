@@ -90,7 +90,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getNickname, getUserRole, updateRole } from '../api/user'
 import { ElMessage } from 'element-plus'
-import { UserFilled, Reading, Aim, Star, Histogram } from '@element-plus/icons-vue'
+import { UserFilled, Reading, Aim, Histogram } from '@element-plus/icons-vue'
 
 // 路由实例
 const router = useRouter()
@@ -205,12 +205,18 @@ const logout = () => {
 
 // 跳转训练页面
 const goTrain = () => {
-  router.push('./train')
+  ElMessage.info('功能开发中...')
+  //router.push('./train')
 }
 
-// 跳转AI测试页面
+// // 跳转AI测试页面
+// const goExam = () => {
+//   router.push('./ai-test')
+// }
+
+// 跳转评估中心页面
 const goExam = () => {
-  router.push('./ai-test')
+  router.push('/exam-center')
 }
 
 // 跳转培训内容页面
@@ -221,8 +227,7 @@ const goTraining = () => {
 // 跳转个人中心页面
 const goProfile = () => {
   router.push('./profile')
-}
-</script>
+}</script>
 
 <style scoped>
 .dashboard-page {
@@ -569,3 +574,4 @@ const goProfile = () => {
   width: 100%;
 }
 </style>
+
