@@ -1686,33 +1686,69 @@ const backToDashboard = () => {
 
 /* 操作按钮 */
 .exam-actions {
-  display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 0;
-}
-
-.nav-btn {
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
+
+.nav-btn {
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
 .nav-btn.prev {
-  background: #f8f9fa;
+  background: #e9ecef;
+}
+
+.submit-btn {
   color: #6c757d;
   border: 1px solid #dee2e6;
 }
 
 .nav-btn.prev:hover {
   background: #e9ecef;
+  transform: translateY(-2px);
+  font-size: 80px;
+  margin-bottom: 20px;
+  display: block;
 }
+
+.result-title {
+  font-size: 36px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 12px;
+}
+
+.result-desc {
+  font-size: 18px;
 
 .submit-btn {
   padding: 14px 32px;
   font-size: 16px;
   font-weight: 600;
   border-radius: 8px;
+  background: linear-gradient(135deg, #667eea, #764ba2) !important;
+  border: none !important;
+  color: white !important;
+  transition: all 0.3s ease;
+}
+
+.submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+}
+
+.submit-btn:disabled {
+  background: #e9ecef !important;
+  color: #adb5bd !important;
+  transform: none;
+  box-shadow: none;
 }
 
 .spacer {
@@ -1895,17 +1931,21 @@ const backToDashboard = () => {
 
 .suggestion-item {
   background: white;
-  border-radius: 12px;
-  padding: 24px;
+  transition: all 0.3s ease;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
   border-left: 4px solid #667eea;
 }
 
-.suggestion-icon {
   font-size: 24px;
   margin-bottom: 12px;
   display: block;
+  text-align: center;
+  margin-bottom: 40px;
 }
+
+.history-filters {
 
 .suggestion-title {
   font-size: 18px;
@@ -1913,31 +1953,18 @@ const backToDashboard = () => {
   color: #2c3e50;
   margin-bottom: 8px;
 }
-
-.suggestion-desc {
-  color: #7f8c8d;
-  line-height: 1.6;
-}
-
-/* 结果操作按钮 */
-.result-actions {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-}
-
-.result-actions .action-btn {
-  padding: 14px 32px;
-  border-radius: 50px;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   font-weight: 600;
   font-size: 16px;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
+}
 .result-actions .action-btn.primary {
   background: linear-gradient(135deg, #667eea, #764ba2);
   border: none;
   color: white;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
 }
 
 .result-actions .action-btn.secondary {
@@ -1953,8 +1980,142 @@ const backToDashboard = () => {
 }
 
 .result-actions .action-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+}
+
+/* ========== 响应式设计 ========== */
+@media (max-width: 768px) {
+  .exam-header {
+    padding: 40px 15px 30px;
+  }
+  
+  .header-title {
+    font-size: 32px;
+  }
+  
+  .header-subtitle {
+    font-size: 14px;
+  }
+  
+  .header-actions {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .action-btn {
+    width: 100%;
+    max-width: 280px;
+  }
+  
+  .section-container {
+    padding: 24px 16px;
+  }
+  
+  .section-title {
+    font-size: 24px;
+  }
+  
+  .mode-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .mode-card {
+    padding: 0;
+  }
+  
+  .card-content {
+    padding: 24px 20px;
+  }
+  
+  .exam-wrapper {
+    padding: 24px 16px;
+  }
+  
+  .exam-progress {
+    padding: 16px 20px;
+  }
+  
+  .question-container {
+    padding: 20px;
+  }
+  
+  .question-text {
+    font-size: 16px;
+  }
+  
+  .question-options.truefalse {
+    flex-direction: column;
+  }
+  
+  .exam-actions {
+    flex-direction: column;
+  }
+  
+  .nav-btn,
+  .submit-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .spacer {
+    display: none;
+  }
+  
+  .result-container {
+    padding: 40px 20px;
+  }
+  
+  .result-title {
+    font-size: 28px;
+  }
+  
+  .score-main {
+    flex-direction: column;
+    gap: 30px;
+  }
+  
+  .score-number {
+    font-size: 56px;
+  }
+  
+  .abilities-grid,
+  .suggestions-list {
+    grid-template-columns: 1fr;
+  }
+  
+  .result-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .result-actions .action-btn {
+    width: 100%;
+    max-width: 260px;
+  }
+}
+
+@media (max-width: 480px) {
+  .exam-header {
+    padding: 30px 10px 20px;
+  }
+  
+  .header-icon {
+    font-size: 48px;
+  }
+  
+  .header-title {
+    font-size: 26px;
+  }
+  
+  .card-icon {
+    font-size: 40px;
+  }
+  
+  .card-title {
+    font-size: 20px;
+  }
 }
 
 /* ========== 测试历史 ========== */

@@ -68,7 +68,6 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getNickname } from '../api/user'
-import { ElMessage } from 'element-plus'
 import { ArrowLeft, EditPen, Document, HomeFilled, Star } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -95,13 +94,13 @@ const logout = () => {
 }
 
 const startTest = () => {
-  ElMessage.info('开始测试功能开发中...')
-  //router.push('/exam-test')
+  // ElMessage.info('开始测试功能开发中...')
+  router.push('/exam-test')
 }
 
 const startMockTest = () => {
-  ElMessage.info('模拟测试功能开发中...')
-  //router.push('/mock-test')
+  // ElMessage.info('模拟测试功能开发中...')
+  router.push('/mock-test')
 }
 
 const viewHistory = () => {
