@@ -1,4 +1,10 @@
 /* 全局基础样式，只做“清底”，不做布局 */
+:root {
+  --primary-color: #8DC149;
+  --primary-dark: #7ab838;
+  --primary-light: #a8d46e;
+}
+
 html, body {
   margin: 0;
   padding: 0;

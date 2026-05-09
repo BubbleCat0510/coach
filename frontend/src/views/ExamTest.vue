@@ -19,7 +19,13 @@
 
     <!-- 主体内容区域 -->
     <div class="content">
-      <div class="exam-container">
+      <!-- 加载状态 -->
+      <div v-if="isLoading" class="loading-container">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在加载题目...</div>
+      </div>
+
+      <div v-else class="exam-container">
         <!-- 测试信息 -->
         <div class="exam-info">
           <div class="info-item">
@@ -37,7 +43,7 @@
         </div>
 
         <!-- 题目内容 -->
-        <div class="question-content" v-if="currentQuestion">
+        <div class="question-content">
           <div class="question-header">
             <span class="question-type">{{ getTypeName(currentQuestion.type) }}</span>
             <span class="question-number">第 {{ currentIndex + 1 }} 题</span>
@@ -115,11 +121,24 @@
     </div>
 
     <!-- 提交确认弹窗 -->
-    <el-dialog title="确认提交" v-model="showSubmitDialog" width="400px">
+    <el-dialog title="确认提交" v-model="showSubmitDialog" width="480px">
       <p>您已完成 {{ answeredCount }}/{{ questions.length }} 道题目</p>
-      <p v-if="questions.length - answeredCount > 0" class="warning">
-        还有 {{ questions.length - answeredCount }} 道题目未作答，确定要提交吗？
-      </p>
+      <div v-if="unansweredQuestions.length > 0">
+        <p class="warning">
+          还有 {{ unansweredQuestions.length }} 道题目未作答：
+        </p>
+        <div class="unanswered-list">
+          <button
+            v-for="num in unansweredQuestions"
+            :key="num"
+            class="unanswered-btn"
+            @click="jumpToUnanswered(num - 1)"
+          >
+            {{ num }}
+          </button>
+        </div>
+        <p class="hint">点击题号可快速跳转</p>
+      </div>
       <template #footer>
         <el-button @click="showSubmitDialog = false">继续答题</el-button>
         <el-button type="primary" @click="confirmSubmit">确认提交</el-button>
@@ -178,7 +197,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getNickname } from '../api/user'
-import { ElMessage } from 'element-plus'
+import { startExam, saveExamResult } from '../api/exam'
 import { ArrowLeft } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -186,7 +205,8 @@ const router = useRouter()
 const username = ref('')
 const currentIndex = ref(0)
 const answers = ref({})
-const remainingTime = ref(60 * 60) // 60分钟
+const TOTAL_TIME = 60 * 60 * 1000 // 60分钟，毫秒级
+const remainingTime = ref(TOTAL_TIME)
 const showSubmitDialog = ref(false)
 const sideNavExpanded = ref(true)
 const showResultDialog = ref(false)
@@ -197,6 +217,10 @@ const examResult = ref({
   unansweredCount: 0,
   accuracy: 0
 })
+const sessionId = ref(null)
+const startTimestamp = ref(null)
+const examStartTime = ref(null)
+const isLoading = ref(true)
 let timer = null
 
 // 模拟题目数据（共25题：10单选、10判断、5多选）
@@ -398,6 +422,15 @@ const questions = ref([
 
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 const answeredCount = computed(() => Object.keys(answers.value).length)
+const unansweredQuestions = computed(() => {
+  const list = []
+  questions.value.forEach((_, index) => {
+    if (!answers.value[index]) {
+      list.push(index + 1)
+    }
+  })
+  return list
+})
 
 onMounted(async () => {
   try {
@@ -408,27 +441,126 @@ onMounted(async () => {
     username.value = '用户'
   }
 
-  // 开始倒计时
-  timer = setInterval(() => {
-    if (remainingTime.value > 0) {
-      remainingTime.value--
-    } else {
-      clearInterval(timer)
+  // 创建考试会话
+  try {
+    const sessionRes = await startExam('comprehensive')
+    sessionId.value = sessionRes.session_id
+    examStartTime.value = new Date().toISOString().replace('T', ' ').substring(0, 19)
+  } catch (error) {
+    console.error('创建考试会话失败:', error)
+  }
+
+  // 加载完成
+  isLoading.value = false
+
+  // 开始倒计时（使用 requestAnimationFrame）
+  startTimestamp.value = Date.now()
+  
+  const updateTimer = () => {
+    const elapsed = Date.now() - startTimestamp.value
+    remainingTime.value = Math.max(0, TOTAL_TIME - elapsed)
+    
+    if (remainingTime.value <= 0) {
       submitExam()
+    } else {
+      timer = requestAnimationFrame(updateTimer)
     }
-  }, 1000)
+  }
+  
+  timer = requestAnimationFrame(updateTimer)
+
+  // 切屏/失焦警告
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  document.addEventListener('blur', handleBlur)
+  
+  // 意外关闭拦截
+  window.addEventListener('beforeunload', handleBeforeUnload)
+  
+  // 键盘快捷键
+  document.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   if (timer) {
-    clearInterval(timer)
+    cancelAnimationFrame(timer)
   }
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  document.removeEventListener('blur', handleBlur)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  document.removeEventListener('keydown', handleKeydown)
 })
 
-const formatTime = (seconds) => {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
+// 切屏警告
+const handleVisibilityChange = () => {
+  if (document.hidden && !showResultDialog.value) {
+    console.log('用户切出页面，时间:', new Date().toLocaleString())
+    ElMessage.warning('检测到您离开了考试页面，请专注答题！')
+  }
+}
+
+// 失焦警告
+const handleBlur = () => {
+  if (!showResultDialog.value) {
+    console.log('页面失去焦点，时间:', new Date().toLocaleString())
+  }
+}
+
+// 意外关闭拦截
+const handleBeforeUnload = (e) => {
+  if (answeredCount.value < questions.value.length && !showResultDialog.value) {
+    e.preventDefault()
+    e.returnValue = ''
+    return ''
+  }
+}
+
+// 键盘快捷键
+const handleKeydown = (e) => {
+  if (isLoading.value || showSubmitDialog.value || showResultDialog.value) {
+    return
+  }
+  
+  const key = e.key.toUpperCase()
+  
+  // A/B/C/D 选择答案
+  if (['A', 'B', 'C', 'D'].includes(key)) {
+    e.preventDefault()
+    const index = ['A', 'B', 'C', 'D'].indexOf(key)
+    if (currentQuestion.value && currentQuestion.value.type !== 'judge') {
+      selectOption(index)
+    }
+  }
+  
+  // 左右箭头切题
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    prevQuestion()
+  }
+  if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    nextQuestion()
+  }
+  
+  // 判断题快捷键
+  if (key === '1' || key === 'ENTER') {
+    if (currentQuestion.value && currentQuestion.value.type === 'judge') {
+      e.preventDefault()
+      selectJudge('正确')
+    }
+  }
+  if (key === '0') {
+    if (currentQuestion.value && currentQuestion.value.type === 'judge') {
+      e.preventDefault()
+      selectJudge('错误')
+    }
+  }
+}
+
+const formatTime = (milliseconds) => {
+  const totalSeconds = Math.floor(milliseconds / 1000)
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
@@ -471,6 +603,11 @@ const goToQuestion = (index) => {
   currentIndex.value = index
 }
 
+const jumpToUnanswered = (index) => {
+  currentIndex.value = index
+  showSubmitDialog.value = false
+}
+
 const toggleSideNav = () => {
   sideNavExpanded.value = !sideNavExpanded.value
 }
@@ -494,6 +631,27 @@ const submitExam = () => {
 const confirmSubmit = () => {
   showSubmitDialog.value = false
   calculateScore()
+  
+  // 计算考试用时（秒）- 使用真实耗时
+  const duration = Math.floor((Date.now() - startTimestamp.value) / 1000)
+  
+  // 保存考试结果到数据库
+  saveExamResult({
+    session_id: sessionId.value,
+    total_score: examResult.value.totalScore,
+    exam_date: examStartTime.value || new Date().toISOString().replace('T', ' ').substring(0, 19),
+    duration: duration,
+    correct_count: examResult.value.correctCount,
+    wrong_count: examResult.value.wrongCount,
+    unanswered_count: examResult.value.unansweredCount,
+    accuracy: examResult.value.accuracy,
+    exam_mode: 'comprehensive'
+  }).then(res => {
+    console.log('考试结果保存成功:', res)
+  }).catch(error => {
+    console.error('保存考试结果失败:', error)
+  })
+  
   showResultDialog.value = true
 }
 
@@ -540,12 +698,40 @@ const goBack = () => {
 <style scoped>
 .exam-test-page {
   min-height: 100vh;
-  background: #d9f4e6;
+}
+
+/* 加载状态样式 */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  gap: 20px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 16px;
+  color: #666;
 }
 
 .header {
   height: 80px;
-  background: linear-gradient(135deg, #8DC149, #7ab838);
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
   color: white;
   display: flex;
   justify-content: space-between;
@@ -652,13 +838,14 @@ const goBack = () => {
 .side-nav {
   position: relative;
   width: 200px;
+  overflow: hidden;
+  padding: 16px;
   transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  transform-origin: right center;
 }
 
 .side-nav.collapsed {
   width: 0;
-  transform: scaleX(0);
+  padding: 0;
   opacity: 0;
   pointer-events: none;
 }
@@ -719,20 +906,20 @@ const goBack = () => {
 }
 
 .side-nav-btn:hover {
-  border-color: #8DC149;
-  color: #8DC149;
+  border-color: var(--primary-color);
+  color: var(--primary-color);
   transform: scale(1.05);
 }
 
 .side-nav-btn.active {
-  background: #8DC149;
+  background: var(--primary-color);
   color: white;
-  border-color: #8DC149;
+  border-color: var(--primary-color);
 }
 
 .side-nav-btn.answered:not(.active) {
   background: #e6f7ee;
-  border-color: #8DC149;
+  border-color: var(--primary-color);
   color: #228b22;
 }
 
@@ -761,11 +948,11 @@ const goBack = () => {
 
 .legend-item .dot.answered {
   background: #e6f7ee;
-  border: 1px solid #8DC149;
+  border: 1px solid var(--primary-color);
 }
 
 .legend-item .dot.current {
-  background: #8DC149;
+  background: var(--primary-color);
 }
 
 .legend-item .dot.unanswered {
@@ -828,12 +1015,12 @@ const goBack = () => {
 }
 
 .option-item:hover {
-  border-color: #8DC149;
+  border-color: var(--primary-color);
   background: #f6fff3;
 }
 
 .option-item.selected {
-  border-color: #8DC149;
+  border-color: var(--primary-color);
   background: #e6f7ee;
 }
 
@@ -852,7 +1039,7 @@ const goBack = () => {
 }
 
 .option-item.selected .option-label {
-  background: #8DC149;
+  background: var(--primary-color);
   color: white;
 }
 
@@ -883,11 +1070,11 @@ const goBack = () => {
 }
 
 .judge-item:hover {
-  border-color: #8DC149;
+  border-color: var(--primary-color);
 }
 
 .judge-item.selected {
-  border-color: #8DC149;
+  border-color: var(--primary-color);
   background: #e6f7ee;
 }
 
@@ -928,6 +1115,38 @@ const goBack = () => {
   color: #faad14;
 }
 
+.unanswered-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.unanswered-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #ffccc7;
+  border-radius: 6px;
+  background: #fff7f6;
+  color: #ff4d4f;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.unanswered-btn:hover {
+  background: #ff4d4f;
+  color: white;
+  border-color: #ff4d4f;
+}
+
+.hint {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
+}
+
 /* 分数结算弹框样式 */
 .result-content {
   display: flex;
@@ -941,7 +1160,7 @@ const goBack = () => {
   width: 160px;
   height: 160px;
   border-radius: 50%;
-  background: linear-gradient(145deg, #8DC149, #6ab82a);
+  background: linear-gradient(145deg, var(--primary-color), var(--primary-dark));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1057,7 +1276,7 @@ const goBack = () => {
 .accuracy-value {
   font-size: 20px;
   font-weight: 700;
-  color: #8DC149;
+  color: var(--primary-color);
 }
 
 .accuracy-progress {
@@ -1071,7 +1290,7 @@ const goBack = () => {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #8DC149, #a8d46e, #8DC149);
+  background: linear-gradient(90deg, var(--primary-color), var(--primary-light), var(--primary-color));
   background-size: 200% 100%;
   border-radius: 5px;
   transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1130,7 +1349,7 @@ const goBack = () => {
 }
 
 .result-btn {
-  background: linear-gradient(135deg, #8DC149, #7ab838) !important;
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)) !important;
   border: none !important;
   color: white !important;
   padding: 12px 48px !important;

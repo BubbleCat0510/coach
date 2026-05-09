@@ -11,7 +11,7 @@
  Target Server Version : 80045 (8.0.45)
  File Encoding         : 65001
 
- Date: 07/05/2026 13:35:46
+ Date: 09/05/2026 09:15:58
 */
 
 SET NAMES utf8mb4;
@@ -30,6 +30,31 @@ CREATE TABLE `coach_exam_report`  (
   `created_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '生成时间',
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '测试总结报告表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for coach_exam_result
+-- ----------------------------
+DROP TABLE IF EXISTS `coach_exam_result`;
+CREATE TABLE `coach_exam_result`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `exam_session_id` bigint NOT NULL,
+  `user_id` bigint NOT NULL,
+  `total_score` int NOT NULL,
+  `exam_date` datetime NOT NULL,
+  `duration` int NOT NULL,
+  `correct_count` int NULL DEFAULT 0,
+  `wrong_count` int NULL DEFAULT 0,
+  `unanswered_count` int NULL DEFAULT 0,
+  `accuracy` decimal(5, 2) NULL DEFAULT 0.00,
+  `exam_mode` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_exam_session_id`(`exam_session_id` ASC) USING BTREE,
+  INDEX `idx_user_id`(`user_id` ASC) USING BTREE,
+  INDEX `idx_exam_date`(`exam_date` ASC) USING BTREE,
+  CONSTRAINT `fk_exam_result_session` FOREIGN KEY (`exam_session_id`) REFERENCES `coach_exam_session` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `fk_exam_result_user` FOREIGN KEY (`user_id`) REFERENCES `coach_user` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for coach_exam_round
