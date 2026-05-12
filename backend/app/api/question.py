@@ -8,7 +8,7 @@ router = APIRouter(prefix="/question")
 
 # 获取题目列表
 @router.get("/list")
-def get_question_list(page: int = 1, page_size: int = 10, search: str = "", current_user: dict = Depends(get_current_user)):
+def get_question_list(page: int = 1, page_size: int = 10, search: str = "", role: int = None, type: str = None, category: int = None, current_user: dict = Depends(get_current_user)):
     try:
         offset = (page - 1) * page_size
         
@@ -18,9 +18,23 @@ def get_question_list(page: int = 1, page_size: int = 10, search: str = "", curr
                 where_clause = "WHERE q.status = 1"
                 params = []
                 
+                # 按分类筛选（精确匹配）
+                if category is not None:
+                    where_clause += " AND q.category = %s"
+                    params.append(category)
+                # 根据角色筛选题目：通用题目（category=0）+ 对应角色的题目（category=role）
+                elif role is not None:
+                    where_clause += " AND (q.category = 0 OR q.category = %s)"
+                    params.append(role)
+                
+                # 按题目类型筛选
+                if type:
+                    where_clause += " AND q.type = %s"
+                    params.append(type)
+                
                 if search:
-                    where_clause += " AND (q.question LIKE %s OR q.category LIKE %s)"
-                    params.extend([f"%{search}%", f"%{search}%"])
+                    where_clause += " AND (q.question LIKE %s)"
+                    params.append(f"%{search}%")
                 
                 # 查询总记录数
                 cursor.execute(f"SELECT COUNT(*) FROM coach_question_bank q {where_clause}", params)
@@ -120,7 +134,7 @@ def add_question(
     question: str = Body(...),
     answer: str = Body(...),
     type: str = Body("single"),
-    category: str = Body(...),
+    category: int = Body(...),
     difficulty: str = Body("medium"),
     options: str = Body(""),
     current_user: dict = Depends(get_current_user)
@@ -134,7 +148,7 @@ def add_question(
                     (question, options, answer, type, category, difficulty, user_id)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """,
-                    (question, options, answer, type, category, difficulty, current_user.get("id"))
+                    (question, options, answer, type, category, difficulty, current_user.get("user_id"))
                 )
                 conn.commit()
                 question_id = cursor.lastrowid
@@ -149,13 +163,13 @@ def add_question(
         return {"success": False, "message": f"添加题目失败: {str(e)}"}
 
 # 更新题目
-@router.post("/update/{question_id}")
+@router.put("/update/{question_id}")
 def update_question(
     question_id: int,
     question: str = Body(...),
     answer: str = Body(...),
     type: str = Body("single"),
-    category: str = Body(...),
+    category: int = Body(...),
     difficulty: str = Body("medium"),
     options: str = Body(""),
     current_user: dict = Depends(get_current_user)
@@ -170,7 +184,7 @@ def update_question(
                         type = %s, category = %s, difficulty = %s, user_id = %s
                     WHERE id = %s
                     """,
-                    (question, options, answer, type, category, difficulty, current_user.get("id"), question_id)
+                    (question, options, answer, type, category, difficulty, current_user.get("user_id"), question_id)
                 )
                 conn.commit()
 
@@ -180,7 +194,7 @@ def update_question(
         return {"success": False, "message": f"更新题目失败: {str(e)}"}
 
 # 删除题目
-@router.post("/delete/{question_id}")
+@router.delete("/delete/{question_id}")
 def delete_question(question_id: int, current_user: dict = Depends(get_current_user)):
     try:
         with get_db() as conn:

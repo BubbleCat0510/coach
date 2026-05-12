@@ -6,60 +6,6 @@ import json
 
 router = APIRouter(prefix="/exam", tags=["Exam"])
 
-# coach_exam_session —— 测试会话表（核心）
-
-# 作用：一次正式能力测试
-
-# 字段名	    类型	    含义
-# id	        bigint	    测试会话 ID
-# user_id	    bigint	    用户 ID
-# exam_mode	    varchar(30)	测试模式（专项/综合/模拟）
-# status	    tinyint	    1 进行中 / 2 已结束 / 3 已评分
-# total_score	int	        总分（评分后生成）
-# exam_rules	json	    测试规则快照
-# create_time	datetime	创建时间
-# finish_time	datetime	测试结束时间
-
-# coach_exam_round —— 测试轮次表（原始记录）
-
-# 作用：测试中每一轮的原始作答
-
-# 字段名	        类型	    含义
-# id	            bigint	    测试轮次 ID
-# exam_session_id	bigint	    测试会话 ID
-# user_id	        bigint	    用户 ID
-# round_no	        int	        第几轮
-# dimension	        varchar(50)	能力维度
-# ai_question	    text	    AI 考题
-# answer_analysis	text	    答案解析（AI生成）
-# ai_reply	        text	    标准答案（AI生成）
-# user_answer	    text	    用户回答
-# round_score	    int	        单轮题目得分（如2/4/10/0）
-# create_time	    datetime	创建时间
-
-# coach_exam_score —— 测试评分表（维度级）
-
-# 作用：测试结束后的能力评分结果
-
-# 字段名	        类型	    含义
-# id	            bigint	    评分 ID
-# exam_session_id	bigint	    测试会话 ID
-# dimension	        varchar(50)	能力维度
-# score	            int	        维度得分（0–100）
-# comment	        text	    评估评语
-
-# coach_exam_report —— 测试总结报告表
-
-# 作用：测试结果的管理视图摘要
-
-# 字段名	        类型	    含义
-# id	            bigint	    报告 ID
-# exam_session_id	bigint	    测试会话 ID
-# summary	        text	    综合能力总结
-# strengths	        text	    优势能力
-# weaknesses	    text	    短板能力
-# created_time	    datetime	生成时间
-
 # 开始考试
 @router.post("/start")
 def start_exam(
@@ -275,5 +221,61 @@ def get_result(
         "round_details": round_details,  # 每道题的得分列表
         "scores": [{"dimension": "综合能力", "score": total_score, "comment": "得分合格"}]  # 兼容原有前端逻辑
     }
+
+# 保存考试结果到 coach_exam_result 表
+@router.post("/save_result")
+def save_exam_result(
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = current_user.get("user_id")
+    session_id = data.get("session_id")
+    total_score = data.get("total_score")
+    exam_date = data.get("exam_date")
+    duration = data.get("duration")
+    correct_count = data.get("correct_count", 0)
+    wrong_count = data.get("wrong_count", 0)
+    unanswered_count = data.get("unanswered_count", 0)
+    accuracy = data.get("accuracy", 0)
+    exam_mode = data.get("exam_mode")
+    
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            # 查询会话获取考试模式
+            if not exam_mode:
+                cursor.execute("SELECT exam_mode FROM coach_exam_session WHERE id=%s", (session_id,))
+                session = cursor.fetchone()
+                if session:
+                    exam_mode = session.get("exam_mode")
+            
+            # 插入考试结果
+            cursor.execute("""
+                INSERT INTO coach_exam_result (
+                    exam_session_id,
+                    user_id,
+                    total_score,
+                    exam_date,
+                    duration,
+                    correct_count,
+                    wrong_count,
+                    unanswered_count,
+                    accuracy,
+                    exam_mode
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                session_id,
+                user_id,
+                total_score,
+                exam_date,
+                duration,
+                correct_count,
+                wrong_count,
+                unanswered_count,
+                accuracy,
+                exam_mode
+            ))
+            conn.commit()
+    
+    return {"success": True, "msg": "考试结果保存成功"}
 
 

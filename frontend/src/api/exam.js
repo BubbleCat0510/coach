@@ -31,3 +31,8 @@ export function getExamResult(sessionId) {
     params: { session_id: sessionId }
   })
 }
+
+// 保存考试结果
+export function saveExamResult(data) {
+  return request.post('/exam/save_result', data)
+}

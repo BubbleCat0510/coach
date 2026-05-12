@@ -95,7 +95,7 @@
           <div v-if="showResult[currentIndex]" class="answer-analysis">
             <h4>答案解析</h4>
             <p><strong>正确答案：</strong>{{ currentQuestion.answer }}</p>
-            <p><strong>解析：</strong>{{ currentQuestion.analysis }}</p>
+            <p><strong>解析：</strong>{{ currentQuestion.analysis || '暂无' }}</p>
           </div>
         </div>
 
@@ -149,7 +149,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getNickname } from '../api/user'
+import { getNickname, getUserRole } from '../api/user'
 import { getQuestionList } from '../api/question'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, HelpFilled, Loading } from '@element-plus/icons-vue'
@@ -190,7 +190,12 @@ onMounted(async () => {
     const nicknameRes = await getNickname()
     username.value = nicknameRes.nickname || '用户'
     
-    const res = await getQuestionList({ page: 1, page_size: 100 })
+    // 获取用户角色
+    const roleRes = await getUserRole()
+    const userRole = roleRes.role
+    
+    // 根据用户角色获取题目（通用题目 + 对应角色的题目）
+    const res = await getQuestionList({ page: 1, page_size: 100, role: userRole })
     if (res.success && res.questions) {
       questions.value = res.questions.map(q => ({
         id: q.id,

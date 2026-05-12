@@ -99,7 +99,7 @@ def get_user_list(current_user: dict = Depends(get_current_user)):
             "id": user["id"],
             "username": user["username"],
             "name": user["name"] or "",
-            "role": user["role"] or "",
+            "role": user["role"] if user["role"] is not None else "",
             "createdAt": user["createdAt"].strftime("%Y-%m-%d %H:%M:%S") if user["createdAt"] else ""
         })
     
@@ -107,7 +107,7 @@ def get_user_list(current_user: dict = Depends(get_current_user)):
 
 # 更新用户角色
 @router.post("/update-role")
-def update_user_role(role: str, current_user: dict = Depends(get_current_user)):
+def update_user_role(role: int, current_user: dict = Depends(get_current_user)):
     user_id = current_user.get("user_id")
     
     # 更新用户角色
@@ -132,7 +132,7 @@ class UserCreate(BaseModel):
     username: str
     name: str
     password: str
-    role: str
+    role: int  # 改为 int 类型
 
 @router.post("/create")
 def create_user(user: UserCreate, current_user: dict = Depends(get_current_user)):

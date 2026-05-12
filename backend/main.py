@@ -71,10 +71,11 @@ def login(req: LoginReq):
 
     # 3️⃣ 角色验证
     print("User data:", user)
-    user_role = user.get("role", "employee")
+    user_role = user.get("role", 1)  # 默认值改为数字
     print("User role:", user_role)
-    if req.role == "admin" and user_role != "管理员":
-        # 用户选择管理员角色但数据库中不是管理员
+    # 现在 role 是数字类型：0=管理员，1-5=其他角色
+    if req.role == "admin" and user_role != 0:
+        # 用户选择管理员角色但数据库中不是管理员（0）
         return {
             "success": False,
             "message": "权限不足，无法以管理员身份登录"
