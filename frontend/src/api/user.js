@@ -41,3 +41,8 @@ export function updateUser(userData) {
 export function deleteUser(userId) {
   return request.post('/user/delete', { id: userId })
 }
+
+// 登出
+export function logoutApi() {
+  return request.post('/user/logout')
+}

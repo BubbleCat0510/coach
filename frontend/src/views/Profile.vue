@@ -41,7 +41,7 @@
             </div>
             <div class="avatar-info">
               <h3>{{ userInfo.nickname }}</h3>
-              <p class="user-role">{{ userInfo.role || '未设置' }}</p>
+              <p class="user-role">{{ getRoleName(userInfo.role) }}</p>
             </div>
           </div>
           
@@ -56,7 +56,7 @@
             </div>
             <div class="info-item">
               <span class="info-label">角色</span>
-              <span class="info-value">{{ userInfo.role || '未设置' }}</span>
+              <span class="info-value">{{ getRoleName(userInfo.role) }}</span>
             </div>
             <div class="info-item">
               <span class="info-label">创建时间</span>
@@ -168,7 +168,7 @@
 // Vue 组合式 API
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getProfile, updateUser } from '../api/user'
+import { getProfile, updateUser, logoutApi } from '../api/user'
 import { ElMessage } from 'element-plus'
 import { UserFilled, Edit, ArrowLeft, SwitchButton } from '@element-plus/icons-vue'
 
@@ -243,7 +243,7 @@ onMounted(async () => {
         id: profileRes.user.id || '',
         username: profileRes.user.username || '未知',
         nickname: profileRes.user.name || '未知',
-        role: profileRes.user.role || '未设置',
+        role: profileRes.user.role !== null && profileRes.user.role !== undefined ? profileRes.user.role : '未设置',
         createdAt: profileRes.user.createdAt || '未知'
       }
     }
@@ -291,11 +291,33 @@ const saveProfile = async () => {
   }
 }
 
+// 角色映射
+const roleMap = {
+  0: '管理员',
+  1: '商铺开发',
+  2: '品牌开发',
+  3: '品牌选址',
+  4: '上门服务',
+  5: '商铺招商'
+}
+
+const getRoleName = (role) => {
+  // 处理字符串类型的数字（如 "0", "1" 等）
+  const roleNum = typeof role === 'string' ? parseInt(role, 10) : role
+  return roleMap[roleNum] || '未设置'
+}
+
 // 退出登录
-const logout = () => {
-  // 清 token
-  localStorage.removeItem('token')
-  router.push('/login')
+const logout = async () => {
+  try {
+    await logoutApi()
+  } catch (error) {
+    console.error('登出接口失败', error)
+  } finally {
+    localStorage.removeItem('token')
+    sessionStorage.clear()
+    router.push('/login')
+  }
 }
 
 // 返回上一页

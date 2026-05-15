@@ -197,6 +197,17 @@ def update_user(user: UserUpdate, current_user: dict = Depends(get_current_user)
 class UserDelete(BaseModel):
     id: int
 
+# 登出接口
+@router.post("/logout")
+def logout(current_user: dict = Depends(get_current_user)):
+    # 在实际项目中，可以在这里实现：
+    # 1. 将token加入黑名单（需要redis或数据库存储）
+    # 2. 清除服务器端session等
+    user_id = current_user.get("user_id")
+    print(f"用户 {user_id} 已登出")
+    
+    return {"success": True, "message": "登出成功"}
+
 # 删除用户
 @router.post("/delete")
 def delete_user(user: UserDelete, current_user: dict = Depends(get_current_user)):

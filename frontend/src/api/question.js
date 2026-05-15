@@ -17,12 +17,12 @@ export function addQuestion(data) {
 
 // 更新题目
 export function updateQuestion(id, data) {
-  return request.post(`/question/update/${id}`, data)
+  return request.put(`/question/update/${id}`, data)
 }
 
 // 删除题目
 export function deleteQuestion(id) {
-  return request.post(`/question/delete/${id}`)
+  return request.delete(`/question/delete/${id}`)
 }
 
 // 获取分类列表

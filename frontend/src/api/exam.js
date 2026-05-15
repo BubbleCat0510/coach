@@ -36,3 +36,15 @@ export function getExamResult(sessionId) {
 export function saveExamResult(data) {
   return request.post('/exam/save_result', data)
 }
+
+// 获取随机题目（正式考试用）
+export function getRandomQuestions() {
+  return request.get('/exam/random_questions')
+}
+
+// 获取历史成绩列表
+export function getExamHistory(page = 1, pageSize = 10) {
+  return request.get('/exam/history', {
+    params: { page, page_size: pageSize }
+  })
+}

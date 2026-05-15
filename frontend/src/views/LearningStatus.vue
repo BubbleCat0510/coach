@@ -24,7 +24,7 @@
         style="width: 100%"
         border
         stripe
-        height="458"
+        :height="tableHeight+'px'"
       >
         <el-table-column prop="userId" label="用户ID" width="80" align="center" header-align="center"></el-table-column>
         <el-table-column prop="nickname" label="用户昵称" width="100" align="center" header-align="center"></el-table-column>
@@ -81,7 +81,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getLearningStatus } from '@/api/upload'
@@ -92,6 +92,7 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const searchQuery = ref('')
+const tableHeight = ref(460) // 表格高度，默认值
 
 // 方法
 const getLearningStatusData = () => {
@@ -151,9 +152,26 @@ const formatDate = (dateString) => {
   return date.toLocaleString('zh-CN')
 }
 
+// 计算表格高度
+const calculateTableHeight = () => {
+  // 获取页面可用高度
+  const windowHeight = window.innerHeight
+  // 减去固定高度：顶部栏约80px + 卡片header约60px + 分页约60px + 边距约60px + 额外余量60px
+  const offsetHeight = 320
+  tableHeight.value = Math.max(400, windowHeight - offsetHeight)
+}
+
 // 生命周期
 onMounted(() => {
   getLearningStatusData()
+  calculateTableHeight()
+  // 监听窗口大小变化
+  window.addEventListener('resize', calculateTableHeight)
+})
+
+onUnmounted(() => {
+  // 移除监听
+  window.removeEventListener('resize', calculateTableHeight)
 })
 </script>
 

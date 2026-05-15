@@ -66,11 +66,11 @@
         <el-form :model="roleForm" ref="roleFormRef" label-width="0">
           <el-form-item prop="role" class="role-select-item">
             <el-select v-model="roleForm.role" placeholder="请选择角色" style="width: 150px;" size="large" :popper-width="300">
-              <el-option label="商铺开发" value="商铺开发" />
-              <el-option label="品牌开发" value="品牌开发" />
-              <el-option label="品牌选址" value="品牌选址" />
-              <el-option label="上门服务" value="上门服务" />
-              <el-option label="商铺招商" value="商铺招商" />
+              <el-option label="商铺开发" :value="1" />
+              <el-option label="品牌开发" :value="2" />
+              <el-option label="品牌选址" :value="3" />
+              <el-option label="上门服务" :value="4" />
+              <el-option label="商铺招商" :value="5" />
             </el-select>
           </el-form-item>
         </el-form>
@@ -88,7 +88,7 @@
 // Vue 组合式 API
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getNickname, getUserRole, updateRole } from '../api/user'
+import { getNickname, getUserRole, updateRole, logoutApi } from '../api/user'
 import { ElMessage } from 'element-plus'
 import { UserFilled, Reading, Aim, Histogram } from '@element-plus/icons-vue'
 
@@ -163,8 +163,8 @@ onMounted(async () => {
     console.log('用户角色数据:', roleRes)
     console.log('用户角色:', userRole)
     
-    // 如果角色为空、空字符串或null，显示角色选择弹窗
-    if (!userRole || (typeof userRole === 'string' && userRole.trim() === '')) {
+    // 如果角色为空、空字符串、null或undefined，显示角色选择弹窗（0是有效的管理员角色）
+    if (userRole === null || userRole === undefined || (typeof userRole === 'string' && userRole.trim() === '')) {
       showRoleDialog.value = true
     }
   } catch (error) {
@@ -197,10 +197,16 @@ const saveRole = async () => {
 }
 
 // 退出登录
-const logout = () => {
-  // 清 token
-  localStorage.removeItem('token')
-  router.push('/login')
+const logout = async () => {
+  try {
+    await logoutApi()
+  } catch (error) {
+    console.error('登出接口失败', error)
+  } finally {
+    localStorage.removeItem('token')
+    sessionStorage.clear()
+    router.push('/login')
+  }
 }
 
 // 跳转训练页面

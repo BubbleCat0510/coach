@@ -190,6 +190,25 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 防作弊警告弹窗 -->
+    <el-dialog
+      v-model="showCheatWarning"
+      width="480px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      title="⚠️ 考试提醒"
+      class="cheat-warning-dialog"
+    >
+      <div class="cheat-warning-content">
+        <p class="warning-message">{{ cheatWarningMessage }}</p>
+        <p class="warning-count">已提醒 {{ cheatWarningCount }}/3 次，累计3次将自动提交试卷</p>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="confirmCheatWarning">确认</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -197,8 +216,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getNickname } from '../api/user'
-import { startExam, saveExamResult } from '../api/exam'
+import { saveExamResult, getRandomQuestions } from '../api/exam'
 import { ArrowLeft } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 
@@ -217,208 +237,43 @@ const examResult = ref({
   unansweredCount: 0,
   accuracy: 0
 })
-const sessionId = ref(null)
+
 const startTimestamp = ref(null)
 const examStartTime = ref(null)
 const isLoading = ref(true)
 let timer = null
 
-// 模拟题目数据（共25题：10单选、10判断、5多选）
-const questions = ref([
-  // ========== 单选题（10题，每题3分）==========
-  {
-    id: 1,
-    question: '以下哪个是Vue3的响应式API？',
-    options: ['ref', 'useState', 'createSignal', 'observable'],
-    answer: 'A',
-    type: 'single',
-    score: 3
-  },
-  {
-    id: 2,
-    question: 'HTTP状态码404表示什么？',
-    options: ['服务器错误', '未找到资源', '请求超时', '重定向'],
-    answer: 'B',
-    type: 'single',
-    score: 3
-  },
-  {
-    id: 3,
-    question: 'JavaScript中，哪个方法可以将字符串转换为整数？',
-    options: ['parseInt()', 'toInteger()', 'int()', 'Number.parseInt()'],
-    answer: 'A',
-    type: 'single',
-    score: 3
-  },
-  {
-    id: 4,
-    question: 'CSS中，用于设置元素相对于其父元素定位的属性是？',
-    options: ['position', 'display', 'float', 'overflow'],
-    answer: 'A',
-    type: 'single',
-    score: 3
-  },
-  {
-    id: 5,
-    question: '以下哪个HTML标签用于创建无序列表？',
-    options: ['<ul>', '<ol>', '<li>', '<dl>'],
-    answer: 'A',
-    type: 'single',
-    score: 3
-  },
-  {
-    id: 6,
-    question: 'Git中，哪个命令用于查看当前仓库的提交历史？',
-    options: ['git log', 'git history', 'git commit log', 'git show'],
-    answer: 'A',
-    type: 'single',
-    score: 3
-  },
-  {
-    id: 7,
-    question: 'JavaScript中，哪个关键字用于声明一个常量？',
-    options: ['const', 'let', 'var', 'constant'],
-    answer: 'A',
-    type: 'single',
-    score: 3
-  },
-  {
-    id: 8,
-    question: 'MySQL中，用于删除表的命令是？',
-    options: ['DROP TABLE', 'DELETE TABLE', 'REMOVE TABLE', 'DROP DATABASE'],
-    answer: 'A',
-    type: 'single',
-    score: 3
-  },
-  {
-    id: 9,
-    question: 'Vue组件中，props选项用于？',
-    options: ['定义组件属性', '定义组件方法', '定义组件数据', '定义组件样式'],
-    answer: 'A',
-    type: 'single',
-    score: 3
-  },
-  {
-    id: 10,
-    question: 'CSS中，哪个属性用于控制元素的透明度？',
-    options: ['opacity', 'transparent', 'visibility', 'alpha'],
-    answer: 'A',
-    type: 'single',
-    score: 3
-  },
-  // ========== 判断题（10题，每题3分）==========
-  {
-    id: 11,
-    question: 'JavaScript中，const声明的变量不能被重新赋值。',
-    answer: '正确',
-    type: 'judge',
-    score: 3
-  },
-  {
-    id: 12,
-    question: 'CSS中，margin可以设置为负值。',
-    answer: '正确',
-    type: 'judge',
-    score: 3
-  },
-  {
-    id: 13,
-    question: 'Git reset --hard 会保留工作区的修改。',
-    answer: '错误',
-    type: 'judge',
-    score: 3
-  },
-  {
-    id: 14,
-    question: 'Vue3中，可以使用Options API和Composition API两种方式编写组件。',
-    answer: '正确',
-    type: 'judge',
-    score: 3
-  },
-  {
-    id: 15,
-    question: 'HTML中，<br>标签不需要闭合。',
-    answer: '正确',
-    type: 'judge',
-    score: 3
-  },
-  {
-    id: 16,
-    question: 'JavaScript中的数组索引从0开始。',
-    answer: '正确',
-    type: 'judge',
-    score: 3
-  },
-  {
-    id: 17,
-    question: 'CSS选择器的优先级：ID选择器 > 类选择器 > 标签选择器。',
-    answer: '正确',
-    type: 'judge',
-    score: 3
-  },
-  {
-    id: 18,
-    question: 'HTTP协议是无状态的。',
-    answer: '正确',
-    type: 'judge',
-    score: 3
-  },
-  {
-    id: 19,
-    question: 'Vue组件中的data必须是一个函数。',
-    answer: '正确',
-    type: 'judge',
-    score: 3
-  },
-  {
-    id: 20,
-    question: 'JavaScript中，typeof null返回"null"。',
-    answer: '错误',
-    type: 'judge',
-    score: 3
-  },
-  // ========== 多选题（5题，每题8分）==========
-  {
-    id: 21,
-    question: 'CSS中，以下哪些是Flexbox的属性？',
-    options: ['display: flex', 'justify-content', 'align-items', 'grid-template'],
-    answer: 'ABC',
-    type: 'multiple',
-    score: 8
-  },
-  {
-    id: 22,
-    question: 'Git中，以下哪些操作可以撤销提交？',
-    options: ['git revert', 'git reset', 'git checkout', 'git pull'],
-    answer: 'AB',
-    type: 'multiple',
-    score: 8
-  },
-  {
-    id: 23,
-    question: 'JavaScript中，以下哪些是数据类型？',
-    options: ['string', 'number', 'boolean', 'symbol', 'undefined', 'null'],
-    answer: 'ABCDEF',
-    type: 'multiple',
-    score: 8
-  },
-  {
-    id: 24,
-    question: 'Vue3中，以下哪些是组合式API的钩子函数？',
-    options: ['onMounted', 'onUpdated', 'onUnmounted', 'onLoad', 'onInit'],
-    answer: 'ABC',
-    type: 'multiple',
-    score: 8
-  },
-  {
-    id: 25,
-    question: 'HTML5中，以下哪些是新增的语义化标签？',
-    options: ['<header>', '<nav>', '<article>', '<div>', '<section>'],
-    answer: 'ABCE',
-    type: 'multiple',
-    score: 8
+// 防作弊相关变量
+const showCheatWarning = ref(false)
+const cheatWarningCount = ref(0)
+const cheatWarningMessage = ref('')
+const MAX_WARNING_COUNT = 3
+
+// 题目列表（从数据库获取）
+const questions = ref([])
+
+// 解析选项字符串
+const parseOptions = (optionsStr) => {
+  if (!optionsStr) return []
+  if (optionsStr.startsWith('[')) {
+    try {
+      return JSON.parse(optionsStr)
+    } catch {
+      return []
+    }
   }
-])
+  const options = []
+  const parts = optionsStr.split(',')
+  for (const part of parts) {
+    const match = part.match(/^([A-D])\.(.+)$/)
+    if (match) {
+      options.push(match[2].trim())
+    } else if (part.trim()) {
+      options.push(part.trim())
+    }
+  }
+  return options
+}
 
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 const answeredCount = computed(() => Object.keys(answers.value).length)
@@ -441,13 +296,27 @@ onMounted(async () => {
     username.value = '用户'
   }
 
-  // 创建考试会话
+  // 记录考试开始时间
+  examStartTime.value = new Date().toISOString().replace('T', ' ').substring(0, 19)
+
+  // 从数据库获取随机题目（单选题10题、判断题10题、多选题5题）
   try {
-    const sessionRes = await startExam('comprehensive')
-    sessionId.value = sessionRes.session_id
-    examStartTime.value = new Date().toISOString().replace('T', ' ').substring(0, 19)
+    const questionsRes = await getRandomQuestions()
+    if (questionsRes.success && questionsRes.questions) {
+      questions.value = questionsRes.questions.map(q => ({
+        id: q.id,
+        question: q.question,
+        options: parseOptions(q.options),
+        answer: q.answer,
+        type: q.type
+      }))
+    } else {
+      console.error('获取题目失败')
+      ElMessage.error('获取题目失败，请刷新重试')
+    }
   } catch (error) {
-    console.error('创建考试会话失败:', error)
+    console.error('获取题目失败:', error)
+    ElMessage.error('获取题目失败，请刷新重试')
   }
 
   // 加载完成
@@ -461,7 +330,9 @@ onMounted(async () => {
     remainingTime.value = Math.max(0, TOTAL_TIME - elapsed)
     
     if (remainingTime.value <= 0) {
-      submitExam()
+      // 倒计时结束，强制提交试卷
+      ElMessage.warning('考试时间已到，系统将自动提交试卷')
+      confirmSubmit()
     } else {
       timer = requestAnimationFrame(updateTimer)
     }
@@ -490,27 +361,96 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
 })
 
+// 显示防作弊警告弹窗
+const showCheatWarningDialog = (message) => {
+  if (showCheatWarning.value) return // 如果弹窗已显示，不再重复弹出
+  
+  cheatWarningCount.value++
+  cheatWarningMessage.value = message
+  
+  console.log(`防作弊提醒 ${cheatWarningCount.value}:`, message, '时间:', new Date().toLocaleString())
+  
+  if (cheatWarningCount.value >= MAX_WARNING_COUNT) {
+    // 超过三次提醒，直接提交试卷
+    ElMessage.warning('已累计3次离开考试页面，系统将自动提交试卷')
+    setTimeout(() => {
+      confirmSubmit()
+    }, 1000)
+  } else {
+    showCheatWarning.value = true
+  }
+}
+
+// 确认防作弊警告
+const confirmCheatWarning = () => {
+  showCheatWarning.value = false
+}
+
 // 切屏警告
 const handleVisibilityChange = () => {
   if (document.hidden && !showResultDialog.value) {
-    console.log('用户切出页面，时间:', new Date().toLocaleString())
-    ElMessage.warning('检测到您离开了考试页面，请专注答题！')
+    showCheatWarningDialog('检测到您离开了考试页面，请专注答题！')
   }
 }
 
 // 失焦警告
 const handleBlur = () => {
   if (!showResultDialog.value) {
-    console.log('页面失去焦点，时间:', new Date().toLocaleString())
+    showCheatWarningDialog('检测到考试页面失去焦点，请专注答题！')
   }
 }
 
-// 意外关闭拦截
-const handleBeforeUnload = (e) => {
-  if (answeredCount.value < questions.value.length && !showResultDialog.value) {
-    e.preventDefault()
-    e.returnValue = ''
-    return ''
+// 关闭页面时提交成绩
+const handleBeforeUnload = async (e) => {
+  if (showResultDialog.value || isLoading.value) return
+  
+  // 阻止默认提示，我们将自动提交成绩
+  e.preventDefault()
+  e.returnValue = ''
+  
+  // 如果没有答题，直接返回
+  if (answeredCount.value === 0) return
+  
+  // 调用通用自动交卷函数
+  autoSubmitExam()
+}
+
+// 自动交卷并保存成绩（通用函数）
+const autoSubmitExam = async () => {
+  // 如果结果弹窗已显示（考试已完成），不重复提交
+  if (showResultDialog.value || isLoading.value) return
+  
+  try {
+    // 计算考试用时（秒）
+    const duration = Math.floor((Date.now() - startTimestamp.value) / 1000)
+    
+    // 构建答案列表（直接传递给 save_result）
+    const roundAnswers = questions.value.map((q, index) => ({
+      round_no: index + 1,
+      question_id: q.id,
+      answer: answers.value[index] || ''
+    }))
+    
+    // 直接提交到结果表（后端计算分数和统计数据，不使用 coach_exam_session）
+    // 使用 keepalive 确保请求在页面关闭时仍能完成
+    await fetch('/api/exam/save_result', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        exam_date: examStartTime.value || new Date().toISOString().replace('T', ' ').substring(0, 19),
+        duration: duration,
+        exam_mode: 'comprehensive',
+        round_answers: roundAnswers  // 直接传递答案，后端计算
+      }),
+      keepalive: true
+    })
+    
+    console.log('成绩已自动提交')
+  } catch (error) {
+    console.error('自动提交成绩失败:', error)
   }
 }
 
@@ -628,29 +568,43 @@ const submitExam = () => {
   showSubmitDialog.value = true
 }
 
-const confirmSubmit = () => {
+const confirmSubmit = async () => {
   showSubmitDialog.value = false
-  calculateScore()
   
   // 计算考试用时（秒）- 使用真实耗时
   const duration = Math.floor((Date.now() - startTimestamp.value) / 1000)
   
-  // 保存考试结果到数据库
-  saveExamResult({
-    session_id: sessionId.value,
-    total_score: examResult.value.totalScore,
-    exam_date: examStartTime.value || new Date().toISOString().replace('T', ' ').substring(0, 19),
-    duration: duration,
-    correct_count: examResult.value.correctCount,
-    wrong_count: examResult.value.wrongCount,
-    unanswered_count: examResult.value.unansweredCount,
-    accuracy: examResult.value.accuracy,
-    exam_mode: 'comprehensive'
-  }).then(res => {
-    console.log('考试结果保存成功:', res)
-  }).catch(error => {
-    console.error('保存考试结果失败:', error)
-  })
+  try {
+    // 构建答案列表（直接传递给 save_result）
+    const roundAnswers = questions.value.map((q, index) => ({
+      round_no: index + 1,
+      question_id: q.id,
+      answer: answers.value[index] || ''
+    }))
+    
+    // 直接提交到结果表（后端计算分数和统计数据，不使用 coach_exam_session）
+    const saveRes = await saveExamResult({
+      exam_date: examStartTime.value || new Date().toISOString().replace('T', ' ').substring(0, 19),
+      duration: duration,
+      exam_mode: 'comprehensive',
+      round_answers: roundAnswers  // 直接传递答案，后端计算
+    })
+    
+    if (saveRes.success) {
+      // 使用后端计算的统计数据
+      examResult.value.correctCount = saveRes.correct_count || 0
+      examResult.value.wrongCount = saveRes.wrong_count || 0
+      examResult.value.unansweredCount = saveRes.unanswered_count || 0
+      examResult.value.accuracy = saveRes.accuracy || 0
+      examResult.value.totalScore = saveRes.total_score || 0
+      console.log('考试结果保存成功:', saveRes)
+    }
+  } catch (error) {
+    console.error('保存结果失败:', error)
+    ElMessage.error('提交失败，请重试')
+    // 降级使用前端计算（仅在后端失败时使用）
+    calculateScore()
+  }
   
   showResultDialog.value = true
 }
@@ -665,11 +619,21 @@ const calculateScore = () => {
     const userAnswer = answers.value[index]
     if (!userAnswer) {
       unansweredCount++
-    } else if (userAnswer === q.answer) {
-      totalScore += q.score
-      correctCount++
     } else {
-      wrongCount++
+      // 多选题答案排序后比较
+      const userAns = userAnswer.toUpperCase().trim()
+      const correctAns = q.answer.toUpperCase().trim()
+      const userSorted = userAns ? userAns.split('').sort().join('') : ''
+      const correctSorted = correctAns ? correctAns.split('').sort().join('') : ''
+      
+      if (userSorted === correctSorted) {
+        // 根据题目类型确定分值
+        const questionScore = q.type === 'multiple' ? 8 : 3
+        totalScore += questionScore
+        correctCount++
+      } else {
+        wrongCount++
+      }
     }
   })
 
@@ -678,7 +642,7 @@ const calculateScore = () => {
     correctCount,
     wrongCount,
     unansweredCount,
-    accuracy: Math.round((correctCount / questions.value.length) * 100)
+    accuracy: questions.value.length > 0 ? Math.round((correctCount / questions.value.length) * 100) : 0
   }
 }
 
@@ -687,11 +651,35 @@ const closeResultDialog = () => {
   router.push('/exam-center')
 }
 
-const goBack = () => {
-  if (timer) {
-    clearInterval(timer)
+const goBack = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要退出考试吗？退出后系统将自动提交您的当前答案并结算成绩。',
+      '确认退出考试',
+      {
+        confirmButtonText: '确认退出',
+        cancelButtonText: '继续答题',
+        type: 'warning',
+        closeOnClickModal: false,
+        closeOnPressEscape: false
+      }
+    )
+    
+    // 用户确认退出，如果有答题则自动交卷
+    if (answeredCount.value > 0) {
+      await autoSubmitExam()
+    }
+    
+    if (timer) {
+      cancelAnimationFrame(timer)
+    }
+    
+    ElMessage.success('成绩已保存')
+    router.push('/exam-center')
+  } catch {
+    // 用户取消退出，继续答题
+    ElMessage.info('继续答题')
   }
-  router.back()
 }
 </script>
 

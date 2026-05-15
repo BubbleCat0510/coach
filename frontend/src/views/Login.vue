@@ -145,7 +145,8 @@ const handleLogin = async () => {
       }
       
       // 根据角色和权限跳转到相应页面
-      if (form.role === 'admin' && (userRole === 'admin' || userRole === '管理员')) {
+      // 数据库中 role 是数字类型：0=管理员，1-5=其他角色
+      if (form.role === 'admin' && (userRole === 'admin' || userRole === '管理员' || userRole === 0)) {
         // 管理员角色且权限验证通过，跳转到管理员界面
         router.push('/admin')
       } else {

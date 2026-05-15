@@ -16,6 +16,7 @@ import Profile from '../views/Profile.vue'
 import ExamCenter from '../views/ExamCenter.vue'
 import ExamTest from '../views/ExamTest.vue'
 import MockTest from '../views/MockTest.vue'
+import ExamHistory from '../views/ExamHistory.vue'
 
 // 定义路由规则
 const routes = [
@@ -65,6 +66,12 @@ const routes = [
     path: '/mock-test',
     name: 'MockTest',
     component: MockTest
+  },
+  // 历史成绩页面
+  {
+    path: '/exam-history',
+    name: 'ExamHistory',
+    component: ExamHistory
   },
   // 培训内容页面
   {

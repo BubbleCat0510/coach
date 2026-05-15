@@ -9,13 +9,38 @@
               v-model="searchQuery"
               placeholder="搜索题目"
               clearable
-              style="width: 300px; margin-right: 10px;"
+              style="width: 200px; margin-right: 10px;"
               @keyup.enter="handleSearch"
             >
               <template #prefix>
                 <el-icon class="el-input__icon"><Search /></el-icon>
               </template>
             </el-input>
+            <el-select 
+              v-model="typeFilter" 
+              placeholder="题目类型" 
+              clearable
+              style="width: 120px; margin-right: 10px;"
+              @change="handleSearch"
+            >
+              <el-option label="单选题" value="single" />
+              <el-option label="多选题" value="multiple" />
+              <el-option label="判断题" value="judge" />
+            </el-select>
+            <el-select 
+              v-model="categoryFilter" 
+              placeholder="分类" 
+              clearable
+              style="width: 120px; margin-right: 10px;"
+              @change="handleSearch"
+            >
+              <el-option label="通用" :value="0" />
+              <el-option label="商铺开发" :value="1" />
+              <el-option label="品牌开发" :value="2" />
+              <el-option label="品牌选址" :value="3" />
+              <el-option label="上门服务" :value="4" />
+              <el-option label="商铺招商" :value="5" />
+            </el-select>
             <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
               添加题目
@@ -26,7 +51,7 @@
 
       <el-table
         :data="questionList"
-        style="width: 100%;height: 460px;"
+        :style="{ width: '100%', height: tableHeight + 'px' }"
         border
         stripe
       >
@@ -140,12 +165,12 @@
         </el-form-item>
         <el-form-item label="分类" prop="category">
           <el-select style="margin-right: 40px;" v-model="formData.category" placeholder="请选择分类">
-            <el-option label="通用" value="general" />
-            <el-option label="商铺开发" value="shop_development" />
-            <el-option label="品牌开发" value="brand_development" />
-            <el-option label="品牌选址" value="brand_location" />
-            <el-option label="上门服务" value="home_service" />
-            <el-option label="商铺招商" value="shop_investment" />
+            <el-option label="通用" :value="0" />
+            <el-option label="商铺开发" :value="1" />
+            <el-option label="品牌开发" :value="2" />
+            <el-option label="品牌选址" :value="3" />
+            <el-option label="上门服务" :value="4" />
+            <el-option label="商铺招商" :value="5" />
           </el-select>
         </el-form-item>
         
@@ -196,7 +221,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { Search, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getQuestionList, addQuestion, updateQuestion, deleteQuestion } from '../api/question'
@@ -207,9 +232,12 @@ const currentPage = ref(1)
 const pageSize = ref(5)
 const total = ref(0)
 const searchQuery = ref('')
+const typeFilter = ref('') // 题目类型筛选
+const categoryFilter = ref(null) // 分类筛选
 const dialogVisible = ref(false)
 const dialogTitle = ref('添加题目')
 const formRef = ref(null)
+const tableHeight = ref(460) // 表格高度，默认值
 const formData = ref({
   id: null,
   question: '',
@@ -307,7 +335,9 @@ const getQuestions = () => {
   getQuestionList({
     page: currentPage.value,
     page_size: pageSize.value,
-    search: searchQuery.value
+    search: searchQuery.value,
+    type: typeFilter.value || undefined,
+    category: categoryFilter.value
   }).then(response => {
     if (response.success) {
       questionList.value = response.questions
@@ -490,14 +520,16 @@ const getDifficultyType = (difficulty) => {
 
 const getCategoryText = (category) => {
   const categoryMap = {
-    'general': '通用',
-    'shop_development': '商铺开发',
-    'brand_development': '品牌开发',
-    'brand_location': '品牌选址',
-    'home_service': '上门服务',
-    'shop_investment': '商铺招商'
+    0: '通用',
+    1: '商铺开发',
+    2: '品牌开发',
+    3: '品牌选址',
+    4: '上门服务',
+    5: '商铺招商'
   }
-  return categoryMap[category] || category
+  // 处理字符串类型的数字
+  const categoryNum = typeof category === 'string' ? parseInt(category, 10) : category
+  return categoryMap[categoryNum] || category
 }
 
 const getOptionsArray = (options) => {
@@ -512,9 +544,26 @@ const getAnswerText = (type, answer) => {
   return answer || '-'
 }
 
+// 计算表格高度
+const calculateTableHeight = () => {
+  // 获取页面可用高度
+  const windowHeight = window.innerHeight
+  // 减去固定高度：顶部栏约80px + 卡片header约60px + 分页约60px + 边距约60px + 额外余量60px
+  const offsetHeight = 320
+  tableHeight.value = Math.max(400, windowHeight - offsetHeight)
+}
+
 // 生命周期
 onMounted(() => {
   getQuestions()
+  calculateTableHeight()
+  // 监听窗口大小变化
+  window.addEventListener('resize', calculateTableHeight)
+})
+
+onUnmounted(() => {
+  // 移除监听
+  window.removeEventListener('resize', calculateTableHeight)
 })
 </script>
 

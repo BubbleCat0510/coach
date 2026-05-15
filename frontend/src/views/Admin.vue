@@ -26,7 +26,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Management } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
-import { getNickname } from '@/api/user'
+import { getNickname, logoutApi } from '@/api/user'
 import Sidebar from '@/components/Sidebar.vue'
 import AdminHeader from '@/components/AdminHeader.vue'
 
@@ -110,13 +110,20 @@ const handleMenuChange = (menu) => {
 }
 
 // 退出登录
-const logout = () => {
-  // 清除登录态
-  localStorage.removeItem('token')
-  localStorage.removeItem('userRole')
-  ElMessage.success('已退出登录')
-  // 跳转到登录页
-  router.push('/login')
+const logout = async () => {
+  try {
+    await logoutApi()
+  } catch (error) {
+    console.error('登出接口失败', error)
+  } finally {
+    // 清除登录态
+    localStorage.removeItem('token')
+    localStorage.removeItem('userRole')
+    sessionStorage.clear()
+    ElMessage.success('已退出登录')
+    // 跳转到登录页
+    router.push('/login')
+  }
 }
 </script>
 

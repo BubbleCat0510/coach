@@ -67,7 +67,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getNickname } from '../api/user'
+import { getNickname, logoutApi } from '../api/user'
 import { ArrowLeft, EditPen, Document, HomeFilled, Star } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -88,9 +88,16 @@ const goBack = () => {
   router.back()
 }
 
-const logout = () => {
-  localStorage.removeItem('token')
-  router.push('/login')
+const logout = async () => {
+  try {
+    await logoutApi()
+  } catch (error) {
+    console.error('登出接口失败', error)
+  } finally {
+    localStorage.removeItem('token')
+    sessionStorage.clear()
+    router.push('/login')
+  }
 }
 
 const startTest = () => {
@@ -104,7 +111,7 @@ const startMockTest = () => {
 }
 
 const viewHistory = () => {
-  router.push('/profile')
+  router.push('/exam-history')
 }
 
 const goHome = () => {

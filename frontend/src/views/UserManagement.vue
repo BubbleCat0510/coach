@@ -45,7 +45,7 @@
         <el-table-column prop="role" label="角色" align="center" header-align="center">
           <template #default="scope">
             <el-tag effect="light" :type="getRoleType(scope.row.role)">
-              {{ scope.row.role || '未设置' }}
+              {{ getRoleName(scope.row.role) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -110,12 +110,12 @@
         </el-form-item>
         <el-form-item label="角&nbsp;&nbsp;&emsp;色" prop="role">
           <el-select v-model="form.role" placeholder="请选择角色">
-            <el-option label="管理员" value="管理员" />
-            <el-option label="商铺开发" value="商铺开发" />
-            <el-option label="品牌开发" value="品牌开发" />
-            <el-option label="品牌选址" value="品牌选址" />
-            <el-option label="上门服务" value="上门服务" />
-            <el-option label="商铺招商" value="商铺招商" />
+            <el-option label="管理员" :value="0" />
+            <el-option label="商铺开发" :value="1" />
+            <el-option label="品牌开发" :value="2" />
+            <el-option label="品牌选址" :value="3" />
+            <el-option label="上门服务" :value="4" />
+            <el-option label="商铺招商" :value="5" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -279,14 +279,29 @@ const handleDelete = (user) => {
   })
 }
 
+const roleMap = {
+  0: '管理员',
+  1: '商铺开发',
+  2: '品牌开发',
+  3: '品牌选址',
+  4: '上门服务',
+  5: '商铺招商'
+}
+
+const getRoleName = (role) => {
+  // 处理字符串类型的数字（如 "0", "1" 等）
+  const roleNum = typeof role === 'string' ? parseInt(role, 10) : role
+  return roleMap[roleNum] || '未设置'
+}
+
 const getRoleType = (role) => {
-  if (!role) return 'info'
-  if (role === '管理员') return 'info'
-  if (role === '商铺开发') return 'primary'
-  if (role === '品牌开发') return 'warning'
-  if (role === '品牌选址') return 'danger'
-  if (role === '上门服务') return 'success'
-  if (role === '商铺招商') return 'info'
+  if (!role && role !== 0) return 'info'
+  if (role === 0 || role === '管理员') return 'info'
+  if (role === 1 || role === '商铺开发') return 'primary'
+  if (role === 2 || role === '品牌开发') return 'warning'
+  if (role === 3 || role === '品牌选址') return 'danger'
+  if (role === 4 || role === '上门服务') return 'success'
+  if (role === 5 || role === '商铺招商') return 'info'
   return 'warning'
 }
 
