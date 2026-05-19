@@ -39,7 +39,7 @@
         <!-- 题目内容 -->
         <div class="question-content" v-if="currentQuestion">
           <div class="question-header">
-            <span class="question-type">{{ getTypeName(currentQuestion.type) }}</span>
+            <span class="question-type" :class="getQuestionTypeClass(currentQuestion.type)">{{ getTypeName(currentQuestion.type) }}</span>
             <span class="question-number">第 {{ currentIndex + 1 }} 题</span>
           </div>
           <h2 class="question-text">{{ currentQuestion.question }}</h2>
@@ -125,14 +125,15 @@
         <button
           v-for="(q, index) in questions"
           :key="index"
-          :class="['side-nav-btn', { 
-            active: currentIndex === index, 
+          :class="['side-nav-btn', {
+            active: currentIndex === index,
             answered: answers[index],
-            correct: showResult[index] && answers[index] === getCorrectAnswer(index), 
-            wrong: showResult[index] && answers[index] && answers[index] !== getCorrectAnswer(index) 
+            correct: showResult[index] && answers[index] === getCorrectAnswer(index),
+            wrong: showResult[index] && answers[index] && answers[index] !== getCorrectAnswer(index)
           }]"
           @click="goToQuestion(index)"
         >
+          <span class="question-badge" :class="getQuestionTypeClass(q.type)"></span>
           {{ index + 1 }}
         </button>
       </div>
@@ -141,8 +142,38 @@
         <div class="legend-item"><span class="dot wrong"></span>答错</div>
         <div class="legend-item"><span class="dot current"></span>当前</div>
         <div class="legend-item"><span class="dot unanswered"></span>未答</div>
+        <div class="legend-item"><span class="dot type-single"></span>单选</div>
+        <div class="legend-item"><span class="dot type-multiple"></span>多选</div>
+        <div class="legend-item"><span class="dot type-judge"></span>判断</div>
       </div>
     </div>
+
+    <!-- 练习结果弹框 -->
+    <el-dialog
+      title="🎉 练习完成"
+      v-model="showResultDialog"
+      width="400px"
+      :close-on-click-modal="false"
+    >
+      <div class="result-summary">
+        <div class="result-item">
+          <span class="result-label">正确题数</span>
+          <span class="result-value correct">{{ correctCount }} 题</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">错误题数</span>
+          <span class="result-value wrong">{{ wrongCount }} 题</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">正确率</span>
+          <span class="result-value accuracy">{{ accuracy }}%</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="resetExam">重新练习</el-button>
+        <el-button @click="showResultDialog = false">查看答案</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -162,8 +193,35 @@ const answers = ref({})
 const showResult = ref({})
 const isLoading = ref(true)
 const questions = ref([])
+const showResultDialog = ref(false)
 
 const currentQuestion = computed(() => questions.value[currentIndex.value])
+
+const correctCount = computed(() => {
+  let count = 0
+  questions.value.forEach((q, index) => {
+    if (showResult.value[index] && answers.value[index] === q.answer) {
+      count++
+    }
+  })
+  return count
+})
+
+const wrongCount = computed(() => {
+  let count = 0
+  questions.value.forEach((q, index) => {
+    if (showResult.value[index] && answers.value[index] && answers.value[index] !== q.answer) {
+      count++
+    }
+  })
+  return count
+})
+
+const accuracy = computed(() => {
+  const answeredCount = Object.keys(showResult.value).length
+  if (answeredCount === 0) return 0
+  return Math.round((correctCount.value / answeredCount) * 100)
+})
 
 const parseOptions = (optionsStr) => {
   if (!optionsStr) return []
@@ -221,6 +279,15 @@ const getTypeName = (type) => {
     judge: '判断题'
   }
   return types[type] || '未知类型'
+}
+
+const getQuestionTypeClass = (type) => {
+  const classes = {
+    single: 'type-single',
+    multiple: 'type-multiple',
+    judge: 'type-judge'
+  }
+  return classes[type] || ''
 }
 
 const getCorrectAnswer = (index) => {
@@ -284,12 +351,18 @@ const checkAnswer = () => {
     return
   }
   showResult.value[currentIndex.value] = true
+
+  const allAnswered = questions.value.every((q, index) => showResult.value[index])
+  if (allAnswered) {
+    showResultDialog.value = true
+  }
 }
 
 const resetExam = () => {
   currentIndex.value = 0
   answers.value = {}
   showResult.value = {}
+  showResultDialog.value = false
 }
 
 const goBack = () => {
@@ -448,8 +521,8 @@ const goBack = () => {
 }
 
 .side-nav-btn {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 32px;
   border: 1px solid #ddd;
   border-radius: 6px;
   background: white;
@@ -460,6 +533,26 @@ const goBack = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.question-badge {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.question-badge.type-single {
+  background: #1890ff;
+}
+
+.question-badge.type-multiple {
+  background: #52c41a;
+}
+
+.question-badge.type-judge {
+  background: #faad14;
 }
 
 .side-nav-btn:hover {
@@ -532,6 +625,18 @@ const goBack = () => {
   border: 1px solid #ddd;
 }
 
+.legend-item .dot.type-single {
+  background: #1890ff;
+}
+
+.legend-item .dot.type-multiple {
+  background: #52c41a;
+}
+
+.legend-item .dot.type-judge {
+  background: #faad14;
+}
+
 .question-content {
   background: white;
   border-radius: 12px;
@@ -548,12 +653,25 @@ const goBack = () => {
 }
 
 .question-type {
-  background: #fff9c4;
-  color: #8B4513;
   padding: 6px 16px;
   border-radius: 20px;
   font-size: 14px;
   font-weight: 500;
+}
+
+.question-type.type-single {
+  background: #e6f0ff;
+  color: #1890ff;
+}
+
+.question-type.type-multiple {
+  background: #e6f7ee;
+  color: #52c41a;
+}
+
+.question-type.type-judge {
+  background: #fff7e6;
+  color: #faad14;
 }
 
 .question-number {
@@ -771,5 +889,43 @@ const goBack = () => {
   .judge-options {
     flex-direction: column;
   }
+}
+
+.result-summary {
+  padding: 20px 0;
+}
+
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.result-item:last-child {
+  border-bottom: none;
+}
+
+.result-label {
+  font-size: 16px;
+  color: #666;
+}
+
+.result-value {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.result-value.correct {
+  color: #52c41a;
+}
+
+.result-value.wrong {
+  color: #ef5350;
+}
+
+.result-value.accuracy {
+  color: #1890ff;
 }
 </style>

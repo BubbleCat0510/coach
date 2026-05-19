@@ -45,7 +45,7 @@
         <!-- 题目内容 -->
         <div class="question-content">
           <div class="question-header">
-            <span class="question-type">{{ getTypeName(currentQuestion.type) }}</span>
+            <span class="question-type" :class="getQuestionTypeClass(currentQuestion.type)">{{ getTypeName(currentQuestion.type) }}</span>
             <span class="question-number">第 {{ currentIndex + 1 }} 题</span>
           </div>
           <h2 class="question-text">{{ currentQuestion.question }}</h2>
@@ -108,6 +108,7 @@
               :class="['side-nav-btn', { active: currentIndex === index, answered: answers[index] }]"
               @click="goToQuestion(index)"
             >
+              <span class="question-badge" :class="getQuestionTypeClass(q.type)"></span>
               {{ index + 1 }}
             </button>
           </div>
@@ -115,6 +116,9 @@
             <div class="legend-item"><span class="dot answered"></span>已答</div>
             <div class="legend-item"><span class="dot current"></span>当前</div>
             <div class="legend-item"><span class="dot unanswered"></span>未答</div>
+            <div class="legend-item"><span class="dot type-single"></span>单选</div>
+            <div class="legend-item"><span class="dot type-multiple"></span>多选</div>
+            <div class="legend-item"><span class="dot type-judge"></span>判断</div>
           </div>
         </div>
       </div>
@@ -513,6 +517,15 @@ const getTypeName = (type) => {
   return types[type] || '未知类型'
 }
 
+const getQuestionTypeClass = (type) => {
+  const classes = {
+    single: 'type-single',
+    multiple: 'type-multiple',
+    judge: 'type-judge'
+  }
+  return classes[type] || ''
+}
+
 const isSelected = (optIndex) => {
   const answer = answers.value[currentIndex.value]
   if (!answer) return false
@@ -879,8 +892,8 @@ const goBack = async () => {
 }
 
 .side-nav-btn {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 32px;
   border: 1px solid #ddd;
   border-radius: 6px;
   background: white;
@@ -891,6 +904,26 @@ const goBack = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.question-badge {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.question-badge.type-single {
+  background: #1890ff;
+}
+
+.question-badge.type-multiple {
+  background: #52c41a;
+}
+
+.question-badge.type-judge {
+  background: #faad14;
 }
 
 .side-nav-btn:hover {
@@ -948,6 +981,18 @@ const goBack = async () => {
   border: 1px solid #ddd;
 }
 
+.legend-item .dot.type-single {
+  background: #1890ff;
+}
+
+.legend-item .dot.type-multiple {
+  background: #52c41a;
+}
+
+.legend-item .dot.type-judge {
+  background: #faad14;
+}
+
 .question-content {
   background: white;
   border-radius: 12px;
@@ -964,12 +1009,25 @@ const goBack = async () => {
 }
 
 .question-type {
-  background: #e6f7ee;
-  color: #228b22;
   padding: 6px 16px;
   border-radius: 20px;
   font-size: 14px;
   font-weight: 500;
+}
+
+.question-type.type-single {
+  background: #e6f0ff;
+  color: #1890ff;
+}
+
+.question-type.type-multiple {
+  background: #e6f7ee;
+  color: #52c41a;
+}
+
+.question-type.type-judge {
+  background: #fff7e6;
+  color: #faad14;
 }
 
 .question-number {

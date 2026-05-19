@@ -60,6 +60,10 @@
                   <span class="stat-label">用时</span>
                 </div>
               </div>
+
+              <div class="item-actions">
+                <el-button type="primary" link @click="viewDetail(item.id)">查看详情</el-button>
+              </div>
             </el-card>
           </div>
 
@@ -171,6 +175,10 @@ const formatDuration = (seconds) => {
     return `${minutes}分${secs}秒`
   }
   return `${secs}秒`
+}
+
+const viewDetail = (id) => {
+  ElMessage.info('功能开发中...')
 }
 </script>
 
@@ -306,6 +314,14 @@ const formatDuration = (seconds) => {
 
 .history-item:hover {
   box-shadow: 0 6px 20px rgba(141, 193, 73, 0.2);
+}
+
+.item-actions {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .item-header {
