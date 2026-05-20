@@ -77,7 +77,11 @@
         <div class="record-list">
           <el-table :data="learningRecords" style="width: 100%" :fit="true">
             <el-table-column prop="date" label="日期" min-width="140" />
-            <el-table-column prop="type" label="类型" min-width="100" />
+            <el-table-column prop="progress" label="学习进度" min-width="120">
+              <template #default="scope">
+                {{ scope.row.progress || 0 }}%
+              </template>
+            </el-table-column>
             <el-table-column prop="content" label="内容" min-width="380" />
             <el-table-column prop="duration" label="时长" min-width="100" />
           </el-table>
@@ -169,6 +173,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getProfile, updateUser, logoutApi } from '../api/user'
+import { getMyLearningRecords } from '../api/upload'
 import { ElMessage } from 'element-plus'
 import { UserFilled, Edit, ArrowLeft, SwitchButton } from '@element-plus/icons-vue'
 
@@ -221,17 +226,25 @@ const rules = {
 }
 
 // 学习记录
-const learningRecords = ref([
-  { date: '2026-04-08', type: '学习', content: '品牌开发基础知识', duration: '45分钟' },
-  { date: '2026-04-07', type: '训练', content: 'AI教练对话训练', duration: '60分钟' },
-  { date: '2026-04-06', type: '学习', content: '商铺选址技巧', duration: '30分钟' }
-])
+const learningRecords = ref([])
 
 // 考试记录
 const examRecords = ref([
   { date: '2026-04-05', type: '专项测试', score: '85', result: '优秀' },
   { date: '2026-04-01', type: '综合测试', score: '78', result: '良好' }
 ])
+
+// 加载学习记录
+const loadLearningRecords = async () => {
+  try {
+    const res = await getMyLearningRecords()
+    if (res.success && res.records) {
+      learningRecords.value = res.records
+    }
+  } catch (error) {
+    console.error('获取学习记录失败:', error)
+  }
+}
 
 // 页面加载时获取用户信息
 onMounted(async () => {
@@ -247,6 +260,8 @@ onMounted(async () => {
         createdAt: profileRes.user.createdAt || '未知'
       }
     }
+    // 加载学习记录
+    await loadLearningRecords()
   } catch (error) {
     console.error('获取用户信息失败:', error)
     ElMessage.error('获取用户信息失败')

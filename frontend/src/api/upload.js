@@ -52,3 +52,7 @@ export function getLearningStatus(page = 1, pageSize = 10, search = '') {
     }
   })
 }
+
+export function getMyLearningRecords() {
+  return request.get('/upload/my-learning-records')
+}

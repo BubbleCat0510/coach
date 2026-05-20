@@ -528,3 +528,66 @@ def get_learning_status(page: int = 1, pageSize: int = 10, search: str = "", cur
             "success": False,
             "message": f"获取学习情况失败: {str(e)}"
         }
+
+@router.get("/my-learning-records")
+def get_my_learning_records(current_user: dict = Depends(get_current_user)):
+    """获取当前用户的学习记录"""
+    try:
+        user_id = current_user.get("user_id")
+
+        with get_db() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        coach_user_file_progress.id,
+                        coach_file_upload.file_name as file_name,
+                        coach_file_upload.file_type as file_type,
+                        coach_user_file_progress.progress,
+                        coach_user_file_progress.is_completed,
+                        coach_user_file_progress.last_read_time,
+                        coach_user_file_progress.total_learning_time
+                    FROM coach_user_file_progress
+                    LEFT JOIN coach_file_upload ON coach_user_file_progress.file_id = coach_file_upload.id
+                    WHERE coach_user_file_progress.user_id = %s
+                    ORDER BY coach_user_file_progress.last_read_time DESC
+                    """,
+                    (user_id,)
+                )
+                records = cursor.fetchall()
+
+        # 转换为前端需要的格式
+        record_list = []
+        for record in records:
+            # 根据文件类型判断学习类型
+            file_type = record.get("file_type", "")
+            if file_type == "pdf":
+                learn_type = "学习"
+            elif file_type == "video":
+                learn_type = "训练"
+            else:
+                learn_type = "学习"
+
+            # 格式化学习时长
+            total_time = record.get("total_learning_time") or 0
+            if total_time >= 60:
+                duration_str = f"{total_time // 60}小时{total_time % 60}分钟" if total_time % 60 > 0 else f"{total_time // 60}小时"
+            else:
+                duration_str = f"{total_time}分钟"
+
+            record_list.append({
+                "date": record["last_read_time"].strftime("%Y-%m-%d") if record["last_read_time"] else "",
+                "progress": record.get("progress") or 0,
+                "content": record["file_name"] or "未知文件",
+                "duration": duration_str
+            })
+
+        return {
+            "success": True,
+            "records": record_list
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"获取学习记录失败: {str(e)}"
+        }
