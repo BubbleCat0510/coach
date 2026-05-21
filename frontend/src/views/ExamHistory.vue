@@ -137,7 +137,13 @@ const handlePageChange = (page) => {
 }
 
 const goBack = () => {
-  router.back()
+  // 检查上一页是否是正式考试页面，如果是则跳转到首页
+  const previousPath = window.history.state?.back
+  if (previousPath === '/exam-test') {
+    router.push('/dashboard')
+  } else {
+    router.back()
+  }
 }
 
 const logout = async () => {
@@ -153,7 +159,7 @@ const logout = async () => {
 }
 
 const getExamModeText = (mode) => {
-  const modeMap = {
+  const modeMap = {                                                                           
     'comprehensive': '正式考试',
     'simulation': '模拟测试',
     'specialized': '专项测试'

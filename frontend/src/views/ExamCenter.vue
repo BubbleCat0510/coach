@@ -85,7 +85,7 @@ onMounted(async () => {
 })
 
 const goBack = () => {
-  router.back()
+  router.push('/dashboard')
 }
 
 const logout = async () => {

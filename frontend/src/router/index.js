@@ -142,6 +142,13 @@ router.beforeEach((to, from, next) => {
     return
   }
 
+  // 防止通过浏览器返回按钮进入正式考试页面
+  // 如果目标页面是正式考试页面，且是从非考试相关页面返回的，则跳转到首页
+  if (to.path === '/exam-test' && from.path !== '/exam-center' && from.path !== '/login') {
+    next('/dashboard')
+    return
+  }
+
   // 有 token，正常放行
   next()
 })

@@ -366,7 +366,13 @@ const resetExam = () => {
 }
 
 const goBack = () => {
-  router.back()
+  // 检查上一页是否是正式考试页面，如果是则跳转到首页
+  const previousPath = window.history.state?.back
+  if (previousPath === '/exam-test') {
+    router.push('/dashboard')
+  } else {
+    router.back()
+  }
 }
 </script>
 

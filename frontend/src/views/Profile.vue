@@ -99,7 +99,11 @@
         <div class="exam-list">
           <el-table :data="examRecords" style="width: 100%" :fit="true" class="exam-table">
             <el-table-column prop="date" label="日期" text-align="center" />
-            <el-table-column prop="type" label="类型" text-align="center" />
+            <el-table-column prop="accuracy" label="正确率" text-align="center">
+              <template #default="scope">
+                {{ scope.row.accuracy || 0 }}%
+              </template>
+            </el-table-column>
             <el-table-column prop="score" label="得分" text-align="center" />
             <el-table-column prop="result" label="结果" text-align="center" />
           </el-table>
@@ -174,6 +178,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getProfile, updateUser, logoutApi } from '../api/user'
 import { getMyLearningRecords } from '../api/upload'
+import { getExamHistory } from '../api/exam'
 import { ElMessage } from 'element-plus'
 import { UserFilled, Edit, ArrowLeft, SwitchButton } from '@element-plus/icons-vue'
 
@@ -229,10 +234,7 @@ const rules = {
 const learningRecords = ref([])
 
 // 考试记录
-const examRecords = ref([
-  { date: '2026-04-05', type: '专项测试', score: '85', result: '优秀' },
-  { date: '2026-04-01', type: '综合测试', score: '78', result: '良好' }
-])
+const examRecords = ref([])
 
 // 加载学习记录
 const loadLearningRecords = async () => {
@@ -244,6 +246,32 @@ const loadLearningRecords = async () => {
   } catch (error) {
     console.error('获取学习记录失败:', error)
   }
+}
+
+// 加载考试记录
+const loadExamRecords = async () => {
+  try {
+    const res = await getExamHistory(1, 10)
+    if (res.success && res.history) {
+      examRecords.value = res.history.map(item => ({
+        date: item.exam_date || item.create_time || '',
+        accuracy: item.accuracy || 0,
+        score: item.total_score || '0',
+        result: getExamResult(item.total_score)
+      }))
+    }
+  } catch (error) {
+    console.error('获取考试记录失败:', error)
+  }
+}
+
+// 获取考试结果等级
+const getExamResult = (score) => {
+  const scoreNum = parseInt(score) || 0
+  if (scoreNum >= 90) return '优秀'
+  if (scoreNum >= 80) return '良好'
+  if (scoreNum >= 60) return '及格'
+  return '不及格'
 }
 
 // 页面加载时获取用户信息
@@ -260,8 +288,8 @@ onMounted(async () => {
         createdAt: profileRes.user.createdAt || '未知'
       }
     }
-    // 加载学习记录
-    await loadLearningRecords()
+    // 并行加载学习记录和考试记录
+    await Promise.all([loadLearningRecords(), loadExamRecords()])
   } catch (error) {
     console.error('获取用户信息失败:', error)
     ElMessage.error('获取用户信息失败')
@@ -335,9 +363,9 @@ const logout = async () => {
   }
 }
 
-// 返回上一页
+// 返回首页
 const goBack = () => {
-  router.back()
+  router.push('/dashboard')
 }
 </script>
 
