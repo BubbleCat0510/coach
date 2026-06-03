@@ -1,80 +1,33 @@
 <template>
   <div class="file-upload-page">
-    <!-- 上传区域 -->
-    <el-card class="upload-card" shadow="hover" style="height: 460px;">
-      <template #header>
-        <div class="card-header">
-          <span>文件上传</span>
-          <div class="upload-info">
-            支持上传：PDF、Word、Excel、PPT、图片等格式
-          </div>
-        </div>
-      </template>
-      
-      <div class="upload-content">
-        <el-upload
-          class="upload-demo"
-          drag
-          action=""
-          :auto-upload="false"
-          :on-change="handleFileChange"
-          :file-list="fileList"
-          :limit="1"
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif"
-        >
-          <el-icon class="el-icon--upload"><Upload /></el-icon>
-          <div class="el-upload__text">拖拽文件到此处或 <em>点击上传</em></div>
-          <template #tip>
-            <div class="el-upload__tip">
-              单个文件大小不超过100MB
-            </div>
-          </template>
-        </el-upload>
-        
-        <div class="upload-actions">
-          <el-input
-            v-model="fileName"
-            placeholder="请输入文件名称"
-            style="width: 300px; margin-bottom: 10px;"
-          />
-          <el-select
-            v-model="fileCategory"
-            placeholder="请选择文件分类"
-            style="width: 200px; margin-bottom: 10px;"
-          >
-            <el-option label="技术文档" value="technical" />
-            <el-option label="培训资料" value="training" />
-            <el-option label="其他" value="other" />
-          </el-select>
-          <el-button type="primary" @click="handleUpload">
-            开始上传
-          </el-button>
-        </div>
-      </div>
-    </el-card>
-
     <!-- 文件列表 -->
-    <el-card class="file-list-card" shadow="hover" style="margin-top: 20px;">
+    <el-card class="file-list-card" shadow="hover">
       <template #header>
         <div class="card-header">
           <span>文件列表</span>
-          <el-input
-            v-model="searchQuery"
-            placeholder="搜索文件名称"
-            clearable
-            style="width: 300px;"
-            @keyup.enter="handleSearch"
-          >
-            <template #prefix>
-              <el-icon class="el-input__icon"><Search /></el-icon>
-            </template>
-          </el-input>
+          <div class="header-actions">
+            <el-input
+              v-model="searchQuery"
+              placeholder="搜索文件名称"
+              clearable
+              style="width: 300px; margin-right: 10px;"
+              @keyup.enter="handleSearch"
+            >
+              <template #prefix>
+                <el-icon class="el-input__icon"><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button type="primary" @click="openUploadDialog">
+              <el-icon><Upload /></el-icon>
+              上传文件
+            </el-button>
+          </div>
         </div>
       </template>
       
       <el-table
         :data="fileListData"
-        style="width: 100%"
+        :style="{ width: '100%', height: tableHeight + 'px' }"
         border
         stripe
       >
@@ -138,11 +91,55 @@
         />
       </div>
     </el-card>
+
+    <!-- 上传文件弹窗 -->
+    <el-dialog
+      v-model="uploadDialogVisible"
+      title="上传文件"
+      width="650px"
+    >
+      <el-form label-width="100px">
+        <el-form-item label="选择文件">
+          <el-upload
+            ref="uploadRef"
+            class="upload-drag-inner"
+            drag
+            action=""
+            :auto-upload="false"
+            :on-change="handleFileChange"
+            :file-list="fileList"
+            :limit="1"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov,.wmv,.flv,.mp3,.wav"
+          >
+            <el-icon class="el-icon--upload large-icon"><Upload /></el-icon>
+            <div class="upload-text">拖拽文件到此处或 <em>点击上传</em></div>
+            <div class="upload-hint">支持 PDF、Word、Excel、PowerPoint、图片、视频、音频等格式，最大100MB</div>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="文件分类">
+          <el-select
+            v-model="fileCategory"
+            placeholder="请选择文件分类"
+            style="width: 100%;margin-right: 40px;"
+          >
+            <el-option label="技术文档" value="technical" />
+            <el-option label="培训资料" value="training" />
+            <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="uploadDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleUpload">上传</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { Search, Upload } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { uploadFile, getFileList, deleteFile as deleteFileApi } from '@/api/upload'
@@ -154,14 +151,27 @@ const currentPage = ref(1)
 const pageSize = ref(5)
 const total = ref(0)
 const searchQuery = ref('')
-const fileName = ref('')
 const fileCategory = ref('technical')
+const uploadDialogVisible = ref(false)
+const uploadRef = ref(null)
+const tableHeight = ref(460)
 
 // 方法
+const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+
+const openUploadDialog = () => {
+  fileList.value = []
+  fileCategory.value = 'technical'
+  uploadDialogVisible.value = true
+}
+
 const handleFileChange = (file) => {
+  if (file.size > MAX_FILE_SIZE) {
+    ElMessage.warning('文件大小不能超过100MB')
+    fileList.value = []
+    return
+  }
   fileList.value = [file]
-  // 自动填充文件名
-  fileName.value = file.name
 }
 
 const handleUpload = () => {
@@ -174,8 +184,8 @@ const handleUpload = () => {
     if (res.success) {
       ElMessage.success('上传成功')
       fileList.value = []
-      fileName.value = ''
       fileCategory.value = 'technical'
+      uploadDialogVisible.value = false
       getFiles()
     } else {
       ElMessage.error(res.message || '上传失败')
@@ -302,17 +312,28 @@ const formatDate = (dateString) => {
   return date.toLocaleString('zh-CN')
 }
 
+// 计算表格高度
+const calculateTableHeight = () => {
+  const windowHeight = window.innerHeight
+  const offsetHeight = 320
+  tableHeight.value = Math.max(400, windowHeight - offsetHeight)
+}
+
 // 生命周期
 onMounted(() => {
   getFiles()
+  calculateTableHeight()
+  window.addEventListener('resize', calculateTableHeight)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', calculateTableHeight)
 })
 </script>
 
 <style scoped>
 .file-upload-page {
   height: 100%;
-  display: flex;
-  flex-direction: column;
 }
 
 .card-header {
@@ -321,32 +342,9 @@ onMounted(() => {
   align-items: center;
 }
 
-.upload-info {
-  font-size: 12px;
-  color: #666;
-}
-
-.upload-content {
+.header-actions {
   display: flex;
-  gap: 20px;
-  height: 100%;
-}
-
-.upload-demo {
-  flex: 1;
-}
-
-.upload-demo :deep(.el-upload-dragger) {
-  width: 50%;
-  margin: 0 auto;
-}
-
-.upload-actions {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 20px;
+  align-items: center;
 }
 
 .pagination-container {
@@ -360,5 +358,45 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+.upload-drag-inner {
+  margin-right: 40px;
+  width: 100%;
+}
+
+.upload-drag-inner :deep(.el-upload-dragger) {
+  width: 100%;
+  padding: 40px 20px;
+  
+  border-radius: 12px;
+}
+
+.upload-drag-inner :deep(.el-upload-dragger:hover) {
+  border-color: #2e8b57;
+  background-color: #f0fdf4;
+}
+
+.large-icon {
+  font-size: 48px;
+  color: #2e8b57;
+  margin-bottom: 16px;
+}
+
+.upload-text {
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.upload-hint {
+  font-size: 13px;
+  color: #999;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 </style>

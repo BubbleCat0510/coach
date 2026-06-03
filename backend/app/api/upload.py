@@ -15,6 +15,9 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/file")
 def upload_file(file: UploadFile = File(...), category: str = Body("other"), current_user: dict = Depends(get_current_user)):
     try:
+        # 文件大小限制：100MB
+        MAX_FILE_SIZE = 100 * 1024 * 1024
+        
         # 生成唯一的文件名
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         filename = f"{timestamp}_{file.filename}"
@@ -23,6 +26,17 @@ def upload_file(file: UploadFile = File(...), category: str = Body("other"), cur
         # 保存文件
         with open(file_path, "wb") as f:
             content = file.file.read()
+            
+            # 检查文件大小
+            if len(content) > MAX_FILE_SIZE:
+                # 删除已写入的文件
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                return {
+                    "success": False,
+                    "message": "文件大小不能超过100MB"
+                }
+                
             f.write(content)
 
         # 计算文件哈希值

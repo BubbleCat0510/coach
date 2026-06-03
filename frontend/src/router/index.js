@@ -17,6 +17,7 @@ import ExamCenter from '../views/ExamCenter.vue'
 import ExamTest from '../views/ExamTest.vue'
 import MockTest from '../views/MockTest.vue'
 import ExamHistory from '../views/ExamHistory.vue'
+import ExamResults from '../views/ExamResults.vue'
 
 // 定义路由规则
 const routes = [
@@ -103,6 +104,11 @@ const routes = [
         path: 'question',
         name: 'QuestionBank',
         component: QuestionBank
+      },
+      {
+        path: 'exam-results',
+        name: 'ExamResults',
+        component: ExamResults
       },
       {
         path: '',

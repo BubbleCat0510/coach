@@ -36,9 +36,13 @@
         
         <div class="profile-info">
           <div class="avatar-section">
-            <div class="avatar">
-              <el-icon class="avatar-icon"><UserFilled /></el-icon>
-            </div>
+            <el-avatar 
+              :size="100" 
+              :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(userInfo.nickname.length <= 2 ? userInfo.nickname : userInfo.nickname.slice(-2))}&background=2e8b57&color=fff`"
+              class="avatar"
+            >
+              <UserFilled />
+            </el-avatar>
             <div class="avatar-info">
               <h3>{{ userInfo.nickname }}</h3>
               <p class="user-role">{{ getRoleName(userInfo.role) }}</p>
@@ -338,10 +342,10 @@ const saveProfile = async () => {
 const roleMap = {
   0: '管理员',
   1: '商铺开发',
-  2: '品牌开发',
-  3: '品牌选址',
-  4: '上门服务',
-  5: '商铺招商'
+  2: '上门服务',
+  3: '品牌开发',
+  4: '商铺招商',
+  5: '品牌选址'
 }
 
 const getRoleName = (role) => {
@@ -592,18 +596,8 @@ const goBack = () => {
 .avatar {
   width: 100px;
   height: 100px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #98FB98, #8DC149);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   margin-right: 30px;
   box-shadow: 0 4px 12px rgba(141, 193, 73, 0.3);
-}
-
-.avatar-icon {
-  font-size: 48px;
-  color: white;
 }
 
 .avatar-info h3 {

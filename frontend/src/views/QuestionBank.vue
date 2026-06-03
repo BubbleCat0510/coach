@@ -36,10 +36,10 @@
             >
               <el-option label="通用" :value="0" />
               <el-option label="商铺开发" :value="1" />
-              <el-option label="品牌开发" :value="2" />
-              <el-option label="品牌选址" :value="3" />
-              <el-option label="上门服务" :value="4" />
-              <el-option label="商铺招商" :value="5" />
+              <el-option label="上门服务" :value="2" />
+              <el-option label="品牌开发" :value="3" />
+              <el-option label="商铺招商" :value="4" />
+              <el-option label="品牌选址" :value="5" />
             </el-select>
             <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
@@ -167,10 +167,10 @@
           <el-select style="margin-right: 40px;" v-model="formData.category" placeholder="请选择分类">
             <el-option label="通用" :value="0" />
             <el-option label="商铺开发" :value="1" />
-            <el-option label="品牌开发" :value="2" />
-            <el-option label="品牌选址" :value="3" />
-            <el-option label="上门服务" :value="4" />
-            <el-option label="商铺招商" :value="5" />
+            <el-option label="上门服务" :value="2" />
+            <el-option label="品牌开发" :value="3" />
+            <el-option label="商铺招商" :value="4" />
+            <el-option label="品牌选 址" :value="5" />
           </el-select>
         </el-form-item>
         
@@ -522,10 +522,10 @@ const getCategoryText = (category) => {
   const categoryMap = {
     0: '通用',
     1: '商铺开发',
-    2: '品牌开发',
-    3: '品牌选址',
-    4: '上门服务',
-    5: '商铺招商'
+    2: '上门服务',
+    3: '品牌开发',
+    4: '商铺招商',
+    5: '品牌选址'
   }
   // 处理字符串类型的数字
   const categoryNum = typeof category === 'string' ? parseInt(category, 10) : category

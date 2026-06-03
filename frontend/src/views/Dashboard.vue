@@ -67,10 +67,10 @@
           <el-form-item prop="role" class="role-select-item">
             <el-select v-model="roleForm.role" placeholder="请选择角色" style="width: 150px;" size="large" :popper-width="300">
               <el-option label="商铺开发" :value="1" />
-              <el-option label="品牌开发" :value="2" />
-              <el-option label="品牌选址" :value="3" />
-              <el-option label="上门服务" :value="4" />
-              <el-option label="商铺招商" :value="5" />
+              <el-option label="上门服务" :value="2" />
+              <el-option label="品牌开发" :value="3" />
+              <el-option label="商铺招商" :value="4" />
+              <el-option label="品牌选址" :value="5" />
             </el-select>
           </el-form-item>
         </el-form>

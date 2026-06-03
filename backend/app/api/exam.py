@@ -531,3 +531,99 @@ def get_exam_history(
     }
 
 
+@router.get("/all_exam_results")
+def get_all_exam_results(
+    page: int = 1,
+    page_size: int = 10,
+    keyword: str = '',
+    role: str = '',
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    获取所有员工的考试成绩（管理员专用）
+    """
+    offset = (page - 1) * page_size
+
+    with get_db() as conn:
+        with conn.cursor() as cursor:
+            # 构建筛选条件
+            where_clause = ""
+            params = []
+            
+            if keyword:
+                where_clause = "WHERE (u.username LIKE %s OR u.nickname LIKE %s)"
+                params.append(f"%{keyword}%")
+                params.append(f"%{keyword}%")
+            
+            if role:
+                role_int = int(role)
+                if where_clause:
+                    where_clause += " AND u.role = %s"
+                else:
+                    where_clause = "WHERE u.role = %s"
+                params.append(role_int)
+
+            # 获取总数
+            count_sql = "SELECT COUNT(*) as total FROM coach_exam_result er LEFT JOIN coach_user u ON er.user_id = u.id"
+            if where_clause:
+                count_sql += " " + where_clause
+            cursor.execute(count_sql, tuple(params))
+            total = cursor.fetchone()["total"]
+
+            # 获取所有考试成绩（关联用户表获取用户信息）
+            select_sql = """
+                SELECT 
+                    er.id,
+                    er.user_id,
+                    u.username,
+                    u.nickname,
+                    u.role,
+                    er.total_score,
+                    er.exam_date,
+                    er.duration,
+                    er.correct_count,
+                    er.wrong_count,
+                    er.unanswered_count,
+                    er.accuracy,
+                    er.exam_mode,
+                    er.create_time
+                FROM coach_exam_result er
+                LEFT JOIN coach_user u ON er.user_id = u.id
+            """
+            if where_clause:
+                select_sql += " " + where_clause
+            select_sql += " ORDER BY er.create_time DESC LIMIT %s OFFSET %s"
+            
+            query_params = tuple(params) + (page_size, offset)
+            cursor.execute(select_sql, query_params)
+            results = cursor.fetchall()
+
+            # 格式化数据
+            result_list = []
+            for item in results:
+                result_list.append({
+                    "id": item["id"],
+                    "user_id": item["user_id"],
+                    "username": item["username"] or '未知',
+                    "name": item["nickname"] or '未知',
+                    "role": item["role"],
+                    "total_score": item["total_score"],
+                    "exam_date": item["exam_date"].strftime("%Y-%m-%d %H:%M:%S") if item["exam_date"] else None,
+                    "duration": item["duration"],
+                    "correct_count": item["correct_count"],
+                    "wrong_count": item["wrong_count"],
+                    "unanswered_count": item["unanswered_count"],
+                    "accuracy": float(item["accuracy"]) if item["accuracy"] else 0,
+                    "exam_mode": item["exam_mode"],
+                    "create_time": item["create_time"].strftime("%Y-%m-%d %H:%M:%S") if item["create_time"] else None
+                })
+
+    return {
+        "success": True,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "results": result_list
+    }
+
+

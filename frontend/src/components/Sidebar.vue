@@ -38,6 +38,14 @@
         <el-icon class="menu-icon"><HelpFilled /></el-icon>
         <span class="menu-text">题库管理</span>
       </div>
+      <div 
+        class="menu-item" 
+        :class="{ active: activeMenu === 'exam-results' }"
+        @click="handleMenuClick('exam-results')"
+      >
+        <el-icon class="menu-icon"><Trophy /></el-icon>
+        <span class="menu-text">员工成绩</span>
+      </div>
     </div>
     
     <div class="sidebar-footer">
@@ -58,7 +66,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { Management, User, Upload, Document, HelpFilled, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
+import { Management, User, Upload, Document, HelpFilled, Trophy, ArrowDown, SwitchButton } from '@element-plus/icons-vue'
 
 // Props
 const props = defineProps({
@@ -79,7 +87,9 @@ const showUserMenu = ref(true)
 
 // 计算属性：用户头像
 const userAvatar = computed(() => {
-  return `https://ui-avatars.com/api/?name=Admin&background=2e8b57&color=fff`
+  const nickname = props.userNickname || '管理员'
+  const avatarName = nickname.length <= 2 ? nickname : nickname.slice(-2)
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(avatarName)}&background=2e8b57&color=fff`
 })
 
 // 方法

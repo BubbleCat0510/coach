@@ -201,7 +201,7 @@ CREATE TABLE `coach_user`  (
   `username` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '登录账号',
   `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '登录密码（哈希）',
   `nickname` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '昵称',
-  `role` tinyint NULL DEFAULT 0 COMMENT '岗位 / 角色：0-管理员，1-商铺开发，2-品牌开发，3-品牌选址，4-上门服务，5-商铺招商',
+  `role` tinyint NULL DEFAULT 0 COMMENT '岗位 / 角色：0-管理员，1-商铺开发，2-上门服务，3-品牌开发，4-商铺招商，5-品牌选址',
   `status` tinyint NULL DEFAULT 1 COMMENT '状态：1 正常 / 0 禁用',
   `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`) USING BTREE,

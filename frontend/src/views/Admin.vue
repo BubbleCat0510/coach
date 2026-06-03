@@ -23,7 +23,6 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Management } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { getNickname, logoutApi } from '@/api/user'
@@ -66,6 +65,8 @@ onMounted(() => {
     activeMenu.value = 'learning'
   } else if (currentPath.includes('/admin/question')) {
     activeMenu.value = 'question'
+  } else if (currentPath.includes('/admin/exam-results')) {
+    activeMenu.value = 'exam-results'
   }
 })
 
@@ -85,6 +86,8 @@ const pageTitle = computed(() => {
       return '学习情况'
     case 'question':
       return '题库管理'
+    case 'exam-results':
+      return '员工成绩'
     default:
       return '管理员控制台'
   }
@@ -105,6 +108,9 @@ const handleMenuChange = (menu) => {
       break
     case 'question':
       router.push('/admin/question')
+      break
+    case 'exam-results':
+      router.push('/admin/exam-results')
       break
   }
 }

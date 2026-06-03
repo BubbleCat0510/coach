@@ -48,3 +48,10 @@ export function getExamHistory(page = 1, pageSize = 10) {
     params: { page, page_size: pageSize }
   })
 }
+
+// 获取所有员工成绩（管理员专用）
+export function getAllExamResults(page = 1, pageSize = 10, keyword = '', role = '') {
+  return request.get('/exam/all_exam_results', {
+    params: { page, page_size: pageSize, keyword, role }
+  })
+}

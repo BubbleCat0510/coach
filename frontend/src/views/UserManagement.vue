@@ -19,7 +19,7 @@
             </el-input>
             <el-button 
               type="primary" 
-              @click="dialogVisible = true"
+              @click="handleAdd"
               style="margin-left: 10px;"
             >
               <el-icon><Plus /></el-icon>
@@ -87,42 +87,79 @@
       </div>
     </el-card>
 
-    <!-- 新增/编辑用户对话框 -->
+    <!-- 添加用户对话框 -->
     <el-dialog
-      v-model="dialogVisible"
-      :title="isEditing ? '编辑用户' : '添加用户'"
+      v-model="addDialogVisible"
+      title="添加用户"
       width="500px"
     >
       <el-form
-        :model="form"
+        :model="addForm"
         label-width="100px"
-        :rules="rules"
-        ref="formRef"
+        :rules="addRules"
+        ref="addFormRef"
       >
         <el-form-item label="用&nbsp;户&nbsp;名" prop="username">
-          <el-input v-model="form.username" placeholder="请输入用户名" />
+          <el-input v-model="addForm.username" placeholder="请输入用户名" />
         </el-form-item>
         <el-form-item label="姓&nbsp;&nbsp;&emsp;名" prop="name">
-          <el-input v-model="form.name" placeholder="请输入姓名" />
+          <el-input v-model="addForm.name" placeholder="请输入姓名" />
         </el-form-item>
-        <el-form-item label="密&nbsp;&nbsp;&emsp;码" prop="password" v-if="!isEditing">
-          <el-input v-model="form.password" type="password" placeholder="请输入密码" />
+        <el-form-item label="密&nbsp;&nbsp;&emsp;码" prop="password">
+          <el-input v-model="addForm.password" type="password" placeholder="请输入密码" />
         </el-form-item>
         <el-form-item label="角&nbsp;&nbsp;&emsp;色" prop="role">
-          <el-select v-model="form.role" placeholder="请选择角色">
+          <el-select v-model="addForm.role" placeholder="请选择角色">
             <el-option label="管理员" :value="0" />
             <el-option label="商铺开发" :value="1" />
-            <el-option label="品牌开发" :value="2" />
-            <el-option label="品牌选址" :value="3" />
-            <el-option label="上门服务" :value="4" />
-            <el-option label="商铺招商" :value="5" />
+            <el-option label="上门服务" :value="2" />
+            <el-option label="品牌开发" :value="3" />
+            <el-option label="商铺招商" :value="4" />
+            <el-option label="品牌选址" :value="5" />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">保存</el-button>
+          <el-button @click="addDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleAddSubmit">保存</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑用户对话框 -->
+    <el-dialog
+      v-model="editDialogVisible"
+      title="编辑用户"
+      width="500px"
+    >
+      <el-form
+        :model="editForm"
+        label-width="100px"
+        :rules="editRules"
+        ref="editFormRef"
+      >
+        <el-form-item label="用&nbsp;户&nbsp;名" prop="username">
+          <el-input v-model="editForm.username" placeholder="请输入用户名" />
+        </el-form-item>
+        <el-form-item label="姓&nbsp;&nbsp;&emsp;名" prop="name">
+          <el-input v-model="editForm.name" placeholder="请输入姓名" />
+        </el-form-item>
+        <el-form-item label="角&nbsp;&nbsp;&emsp;色" prop="role">
+          <el-select v-model="editForm.role" placeholder="请选择角色">
+            <el-option label="管理员" :value="0" />
+            <el-option label="商铺开发" :value="1" />
+            <el-option label="上门服务" :value="2" />
+            <el-option label="品牌开发" :value="3" />
+            <el-option label="商铺招商" :value="4" />
+            <el-option label="品牌选址" :value="5" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="editDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleEditSubmit">保存</el-button>
         </span>
       </template>
     </el-dialog>
@@ -141,25 +178,40 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const searchQuery = ref('')
-const dialogVisible = ref(false)
-const isEditing = ref(false)
-const formRef = ref(null)
+const addDialogVisible = ref(false)
+const editDialogVisible = ref(false)
+const addFormRef = ref(null)
+const editFormRef = ref(null)
 const loading = ref(false)
 
-// 表单数据
-const form = reactive({
-  id: '',
+// 添加用户表单数据
+const addForm = reactive({
   username: '',
   name: '',
   password: '',
   role: ''
 })
 
-// 表单验证规则
-const rules = reactive({
+// 编辑用户表单数据
+const editForm = reactive({
+  id: '',
+  username: '',
+  name: '',
+  role: ''
+})
+
+// 添加用户表单验证规则
+const addRules = reactive({
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-  password: [{ required: false, message: '请输入密码', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  role: [{ required: true, message: '请选择角色', trigger: 'change' }]
+})
+
+// 编辑用户表单验证规则
+const editRules = reactive({
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
   role: [{ required: true, message: '请选择角色', trigger: 'change' }]
 })
 
@@ -198,54 +250,73 @@ const handleCurrentChange = (current) => {
   currentPage.value = current
 }
 
-const handleEdit = (row) => {
-  isEditing.value = true
-  form.id = row.id
-  form.username = row.username
-  form.name = row.name
-  form.role = row.role
-  dialogVisible.value = true
+const handleAdd = () => {
+  addForm.username = ''
+  addForm.name = ''
+  addForm.password = ''
+  addForm.role = ''
+  if (addFormRef.value) {
+    addFormRef.value.resetFields()
+  }
+  addDialogVisible.value = true
 }
 
-const handleSubmit = async () => {
-  if (!formRef.value) return
+const handleEdit = (row) => {
+  editForm.id = row.id
+  editForm.username = row.username
+  editForm.name = row.name
+  editForm.role = row.role
+  if (editFormRef.value) {
+    editFormRef.value.resetFields()
+  }
+  editDialogVisible.value = true
+}
+
+const handleAddSubmit = async () => {
+  if (!addFormRef.value) return
   
   try {
-    await formRef.value.validate()
+    await addFormRef.value.validate()
     
-    if (isEditing.value) {
-      // 编辑用户
-      const response = await updateUser(form)
-      if (response && response.success) {
-        const index = userList.value.findIndex(u => u.id === form.id)
-        if (index !== -1) {
-          userList.value[index] = {
-            ...userList.value[index],
-            username: form.username,
-            name: form.name,
-            role: form.role
-          }
-        }
-        ElMessage.success('用户编辑成功')
-      } else {
-        ElMessage.error('用户编辑失败')
-      }
+    const response = await createUser(addForm)
+    if (response && response.success) {
+      await getUsers()
+      addDialogVisible.value = false
+      ElMessage.success('用户添加成功')
     } else {
-      // 添加用户
-      const response = await createUser(form)
-      if (response && response.success) {
-        // 重新加载用户列表
-        await getUsers()
-        ElMessage.success('用户添加成功')
-      } else {
-        ElMessage.error('用户添加失败')
-      }
+      ElMessage.error('用户添加失败')
     }
-    
-    dialogVisible.value = false
   } catch (error) {
-    console.error('保存用户失败:', error)
-    ElMessage.error('保存用户失败')
+    console.error('添加用户失败:', error)
+    ElMessage.error('添加用户失败')
+  }
+}
+
+const handleEditSubmit = async () => {
+  if (!editFormRef.value) return
+  
+  try {
+    await editFormRef.value.validate()
+    
+    const response = await updateUser(editForm)
+    if (response && response.success) {
+      const index = userList.value.findIndex(u => u.id === editForm.id)
+      if (index !== -1) {
+        userList.value[index] = {
+          ...userList.value[index],
+          username: editForm.username,
+          name: editForm.name,
+          role: editForm.role
+        }
+      }
+      editDialogVisible.value = false
+      ElMessage.success('用户编辑成功')
+    } else {
+      ElMessage.error('用户编辑失败')
+    }
+  } catch (error) {
+    console.error('编辑用户失败:', error)
+    ElMessage.error('编辑用户失败')
   }
 }
 
@@ -282,10 +353,10 @@ const handleDelete = (user) => {
 const roleMap = {
   0: '管理员',
   1: '商铺开发',
-  2: '品牌开发',
-  3: '品牌选址',
-  4: '上门服务',
-  5: '商铺招商'
+  2: '上门服务',
+  3: '品牌开发',
+  4: '商铺招商',
+  5: '品牌选址'
 }
 
 const getRoleName = (role) => {
@@ -298,10 +369,10 @@ const getRoleType = (role) => {
   if (!role && role !== 0) return 'info'
   if (role === 0 || role === '管理员') return 'info'
   if (role === 1 || role === '商铺开发') return 'primary'
-  if (role === 2 || role === '品牌开发') return 'warning'
-  if (role === 3 || role === '品牌选址') return 'danger'
-  if (role === 4 || role === '上门服务') return 'success'
-  if (role === 5 || role === '商铺招商') return 'info'
+  if (role === 2 || role === '上门服务') return 'success'
+  if (role === 3 || role === '品牌开发') return 'warning'
+  if (role === 4 || role === '商铺招商') return 'info'
+  if (role === 5 || role === '品牌选址') return 'danger'
   return 'warning'
 }
 
