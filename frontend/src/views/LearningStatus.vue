@@ -11,6 +11,8 @@
             clearable
             style="width: 300px;"
             @keyup.enter="handleSearch"
+            @input="handleSearch"
+            @clear="handleSearch"
           >
             <template #prefix>
               <el-icon class="el-input__icon"><Search /></el-icon>
@@ -27,6 +29,11 @@
       >
         <el-table-column prop="userId" label="用户ID" width="80" align="center" header-align="center"></el-table-column>
         <el-table-column prop="nickname" label="用户昵称" width="100" align="center" header-align="center"></el-table-column>
+        <el-table-column prop="userRole" label="用户角色" width="120" align="center" header-align="center">
+          <template #default="scope">
+            <el-tag size="small" :type="getRoleTagType(scope.row.userRole)">{{ getRoleText(scope.row.userRole) }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="fileId" label="文件ID" width="100" align="center" header-align="center"></el-table-column>
         <el-table-column prop="fileName" label="文件名称" min-width="300" align="center" header-align="center">
           <template #default="scope">
@@ -97,21 +104,24 @@ const pageHeight = ref(600) // 页面高度
 // 方法
 const getLearningStatusData = () => {
   getLearningStatus(currentPage.value, pageSize.value, searchQuery.value).then(res => {
-    if (res.success) {
-      learningStatusList.value = res.records || []
-      total.value = res.total || 0
-    } else {
-      ElMessage.error('获取学习情况失败')
-    }
+    learningStatusList.value = res.records || []
+    total.value = res.total || 0
   }).catch(err => {
     console.error('获取学习情况错误:', err)
-    ElMessage.error('网络错误，请稍后重试')
   })
 }
 
+// 防抖定时器
+let searchTimer = null
+
 const handleSearch = () => {
-  currentPage.value = 1
-  getLearningStatusData()
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+  searchTimer = setTimeout(() => {
+    currentPage.value = 1
+    getLearningStatusData()
+  }, 300)
 }
 
 const handleSizeChange = (size) => {
@@ -132,6 +142,34 @@ const getProgressColor = (progress) => {
   } else {
     return '#409EFF'
   }
+}
+
+// 岗位映射
+const roleMap = {
+  0: '管理员',
+  1: '商铺开发',
+  2: '上门服务',
+  3: '品牌开发',
+  4: '商铺招商',
+  5: '品牌选址'
+}
+
+// 获取岗位文本
+const getRoleText = (role) => {
+  return roleMap[role] || '其他'
+}
+
+// 获取岗位标签类型
+const getRoleTagType = (role) => {
+  const typeMap = {
+    0: 'warning',     // 管理员 - 橙色
+    1: 'primary',    // 商铺开发 - 蓝色
+    2: 'success',    // 上门服务 - 绿色
+    3: 'warning',    // 品牌开发 - 橙色
+    4: 'danger',     // 商铺招商 - 红色
+    5: 'info'        // 品牌选址 - 灰色
+  }
+  return typeMap[role] || 'info'
 }
 
 const formatLearningTime = (seconds) => {

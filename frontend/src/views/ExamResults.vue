@@ -281,10 +281,18 @@ const loadData = async () => {
   }
 }
 
+// 防抖定时器
+let searchTimer = null
+
 // 搜索
 const handleSearch = () => {
-  currentPage.value = 1
-  loadData()
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+  searchTimer = setTimeout(() => {
+    currentPage.value = 1
+    loadData()
+  }, 300)
 }
 
 // 分页

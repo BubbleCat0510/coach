@@ -11,6 +11,8 @@
               clearable
               style="width: 200px; margin-right: 10px;"
               @keyup.enter="handleSearch"
+              @input="handleSearch"
+              @clear="handleSearch"
             >
               <template #prefix>
                 <el-icon class="el-input__icon"><Search /></el-icon>
@@ -170,7 +172,7 @@
             <el-option label="上门服务" :value="2" />
             <el-option label="品牌开发" :value="3" />
             <el-option label="商铺招商" :value="4" />
-            <el-option label="品牌选 址" :value="5" />
+            <el-option label="品牌选址" :value="5" />
           </el-select>
         </el-form-item>
         
@@ -252,7 +254,7 @@ const formData = ref({
 // 表单验证规则
 const rules = {
   question: [
-    { required: true, message: '请输入题目内容', trigger: 'blur' }
+    { required: true, message: '请输入题目内容', trigger: 'change' }
   ],
   type: [
     { required: true, message: '请选择题目类型', trigger: 'change' }
@@ -352,9 +354,17 @@ const getQuestions = () => {
   })
 }
 
+// 防抖定时器
+let searchTimer = null
+
 const handleSearch = () => {
-  currentPage.value = 1
-  getQuestions()
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+  searchTimer = setTimeout(() => {
+    currentPage.value = 1
+    getQuestions()
+  }, 300)
 }
 
 const handleSizeChange = (size) => {

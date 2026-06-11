@@ -201,9 +201,12 @@
           <div v-else-if="contentType === 'video'" class="video-content">
             <h1>{{ content.title }}</h1>
             <video
+              ref="videoRef"
               :src="content.url"
               controls
               class="preview-video"
+              @timeupdate="handleVideoTimeUpdate"
+              @loadedmetadata="handleVideoLoaded"
             >
               您的浏览器不支持视频播放
             </video>
@@ -293,6 +296,8 @@ const progressPercentage = ref(0)
 const learningTimes = ref({}) // 存储每个文件的学习时间，格式：{ fileId: seconds }
 const currentLearningTime = ref(0) // 当前文件的学习时间
 const timer = ref(null)
+const videoRef = ref(null) // 视频元素引用
+const videoDuration = ref(0) // 视频总时长
 
 // 格式化学习时间
 const formatLearningTime = (seconds) => {
@@ -471,17 +476,12 @@ const loadTextFileContent = async (fileId) => {
     const response = await axios({
       url: `http://localhost:8001/upload/download/${fileId}`,
       method: 'GET',
-      responseType: 'json',
+      responseType: 'text', // 修复：使用 text 类型加载文本文件
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
     })
-    if (response.data.success) {
-      fileContent.value = response.data.content
-    } else {
-      console.error('加载文件内容失败:', response.data.message)
-      fileContent.value = ''
-    }
+    fileContent.value = response.data
   } catch (error) {
     console.error('加载文件内容失败:', error)
     fileContent.value = ''
@@ -674,7 +674,7 @@ const handleKeydown = (event) => {
 // 加载学习进度
 const loadProgress = async (fileId) => {
   try {
-    const response = await getProgress(fileId)
+    const response = await getProgress(fileId, currentUserRole.value)
     if (response && response.success) {
       progressPercentage.value = response.progress
       if (response.learning_time) {
@@ -696,9 +696,10 @@ const saveProgress = async (fileId, progress) => {
     console.log('保存学习进度 - 参数:', {
       fileId,
       progress,
-      currentLearningTime: currentTime
+      currentLearningTime: currentTime,
+      role: currentUserRole.value
     })
-    const response = await updateProgress(fileId, progress, currentTime)
+    const response = await updateProgress(fileId, progress, currentTime, currentUserRole.value)
     console.log('保存学习进度 - 后端返回:', response)
   } catch (error) {
     console.error('保存学习进度失败:', error)
@@ -795,18 +796,50 @@ const getFileIcon = (fileType) => {
   } else if (fileType.startsWith('video/')) {
     return 'VideoCamera'
   } else if (fileType.startsWith('audio/')) {
-    return 'VideoCamera'
+    return 'Headset' // 修复：音频使用耳机图标
   } else {
     return 'Document'
   }
 }
 
-// 加载文件列表
+// 视频加载完成
+const handleVideoLoaded = () => {
+  if (videoRef.value) {
+    videoDuration.value = videoRef.value.duration
+  }
+}
+
+// 视频播放进度更新
+const handleVideoTimeUpdate = () => {
+  if (videoRef.value && videoDuration.value > 0) {
+    const currentTime = videoRef.value.currentTime
+    const progress = Math.round((currentTime / videoDuration.value) * 100)
+    
+    // 更新学习进度
+    if (progressPercentage.value < 100 && progress > progressPercentage.value) {
+      progressPercentage.value = progress
+      // 保存学习进度和时间
+      saveProgress(currentCategoryId.value, progress)
+    }
+    
+    // 更新学习时间（使用视频播放时间）
+    currentLearningTime.value = Math.round(currentTime)
+  }
+}
+
+// 当前用户角色
+const currentUserRole = ref(1)
+
+// 加载文件列表，只显示当前用户岗位的文件
 const loadCategories = async () => {
   try {
     loadingFiles.value = true
-    // 调用API获取文件列表
-    const response = await getFileList(1, 100, '')
+    // 获取当前用户信息
+    const userInfo = JSON.parse(localStorage.getItem('user')) || {}
+    currentUserRole.value = userInfo.role || 1
+    
+    // 调用API获取当前岗位的文件列表
+    const response = await getFileList(1, 100, '', currentUserRole.value)
     if (response && response.success && response.files) {
       files.value = response.files
     }

@@ -16,8 +16,8 @@ export function getUserRole() {
 }
 
 // 获取用户列表（管理员权限）
-export function getUserList() {
-  return request.get('/user/list')
+export function getUserList(params) {
+  return request.get('/user/list', { params })
 }
 
 // 更新用户角色

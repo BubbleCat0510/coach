@@ -12,6 +12,8 @@
               clearable
               style="width: 300px; margin-right: 10px;"
               @keyup.enter="handleSearch"
+              @input="handleSearch"
+              @clear="handleSearch"
             >
               <template #prefix>
                 <el-icon class="el-input__icon"><Search /></el-icon>
@@ -43,6 +45,11 @@
         <el-table-column prop="category" label="文件分类" width="120" align="center" header-align="center">
           <template #default="scope">
             <el-tag size="small">{{ getCategoryText(scope.row.category) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="role" label="所属岗位" width="120" align="center" header-align="center">
+          <template #default="scope">
+            <el-tag size="small" :type="getRoleTagType(scope.row.role)">{{ getRoleText(scope.row.role) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="type" label="文件类型" width="120" align="center" header-align="center">
@@ -107,13 +114,14 @@
             action=""
             :auto-upload="false"
             :on-change="handleFileChange"
+            :before-upload="handleBeforeUpload"
             :file-list="fileList"
             :limit="1"
             accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov,.wmv,.flv,.mp3,.wav"
           >
             <el-icon class="el-icon--upload large-icon"><Upload /></el-icon>
             <div class="upload-text">拖拽文件到此处或 <em>点击上传</em></div>
-            <div class="upload-hint">支持 PDF、Word、Excel、PowerPoint、图片、视频、音频等格式，最大100MB</div>
+            <div class="upload-hint">支持 PDF、Word、Excel、PowerPoint、图片、视频、音频等格式，最大500MB</div>
           </el-upload>
         </el-form-item>
         <el-form-item label="文件分类">
@@ -125,6 +133,19 @@
             <el-option label="技术文档" value="technical" />
             <el-option label="培训资料" value="training" />
             <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="所属岗位">
+          <el-select
+            v-model="fileRole"
+            placeholder="请选择所属岗位"
+            style="width: 100%;margin-right: 40px;"
+          >
+            <el-option label="商铺开发" :value="1" />
+            <el-option label="上门服务" :value="2" />
+            <el-option label="品牌开发" :value="3" />
+            <el-option label="商铺招商" :value="4" />
+            <el-option label="品牌选址" :value="5" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -152,71 +173,124 @@ const pageSize = ref(5)
 const total = ref(0)
 const searchQuery = ref('')
 const fileCategory = ref('technical')
+const fileRole = ref(1) // 默认选择第一个岗位
 const uploadDialogVisible = ref(false)
 const uploadRef = ref(null)
 const tableHeight = ref(460)
 
 // 方法
-const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
 
 const openUploadDialog = () => {
   fileList.value = []
   fileCategory.value = 'technical'
+  fileRole.value = 1 // 重置为第一个岗位
+  // 清空上传组件的内部状态
+  if (uploadRef.value) {
+    uploadRef.value.clearFiles()
+  }
   uploadDialogVisible.value = true
 }
 
-const handleFileChange = (file) => {
+// 文件选择变化时触发
+const handleFileChange = (file, uploadFileList) => {
+  console.log('handleFileChange - file:', file)
+  console.log('handleFileChange - uploadFileList:', uploadFileList)
+  console.log('handleFileChange - 响应式 fileList.value:', fileList.value)
+  
+  // 检查文件大小
   if (file.size > MAX_FILE_SIZE) {
-    ElMessage.warning('文件大小不能超过100MB')
+    ElMessage.warning('文件大小不能超过500MB')
+    // 清空上传组件的内部状态
+    if (uploadRef.value) {
+      uploadRef.value.clearFiles()
+    }
+    // 清空响应式变量
     fileList.value = []
     return
   }
-  fileList.value = [file]
+  
+  // 文件通过校验，更新响应式 fileList
+  // Element Plus 的 on-change 会自动更新 file-list，但我们手动同步确保一致性
+  console.log('文件校验通过，文件名:', file.name, '大小:', file.size)
+  fileList.value = uploadFileList
+}
+
+// 使用 before-upload 钩子统一处理文件校验（上传前再次校验）
+const handleBeforeUpload = (file) => {
+  console.log('handleBeforeUpload - file:', file)
+  
+  if (file.size > MAX_FILE_SIZE) {
+    ElMessage.warning('文件大小不能超过500MB')
+    // 清空上传组件的内部状态
+    if (uploadRef.value) {
+      uploadRef.value.clearFiles()
+    }
+    return false
+  }
+  
+  console.log('before-upload 校验通过')
+  // 返回 false 阻止自动上传（手动控制上传）
+  return false
 }
 
 const handleUpload = () => {
+  console.log('handleUpload - fileList.value:', fileList.value)
+  console.log('handleUpload - fileList.value.length:', fileList.value.length)
+  
   if (fileList.value.length === 0) {
     ElMessage.warning('请选择文件')
     return
   }
 
-  uploadFile(fileList.value[0].raw, fileCategory.value).then(res => {
-    if (res.success) {
-      ElMessage.success('上传成功')
-      fileList.value = []
-      fileCategory.value = 'technical'
-      uploadDialogVisible.value = false
-      getFiles()
-    } else {
-      ElMessage.error(res.message || '上传失败')
-    }
+  // 检查文件对象结构
+  const selectedFile = fileList.value[0]
+  console.log('handleUpload - selectedFile:', selectedFile)
+  console.log('handleUpload - selectedFile.raw:', selectedFile?.raw)
+  
+  if (!selectedFile?.raw) {
+    ElMessage.warning('文件对象格式不正确')
+    return
+  }
+
+  uploadFile(selectedFile.raw, fileCategory.value, fileRole.value).then(res => {
+    ElMessage.success('上传成功')
+    fileList.value = []
+    fileCategory.value = 'technical'
+    fileRole.value = 1
+    uploadDialogVisible.value = false
+    getFiles()
   }).catch(err => {
     console.error('上传文件错误:', err)
-    ElMessage.error('网络错误，请稍后重试')
   })
 }
 
+// 防抖定时器
+let searchTimer = null
+
 const getFiles = () => {
   getFileList(currentPage.value, pageSize.value, searchQuery.value).then(res => {
-    if (res.success) {
-      fileListData.value = res.files || []
-      total.value = res.total || 0
-    } else {
-      ElMessage.error('获取文件列表失败')
-    }
+    fileListData.value = res.files || []
+    total.value = res.total || 0
   }).catch(err => {
     console.error('获取文件列表错误:', err)
-    ElMessage.error('网络错误，请稍后重试')
   })
 }
 
 const handleSearch = () => {
-  currentPage.value = 1
-  getFiles()
+  // 防抖处理：300ms内多次输入只执行最后一次
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+  searchTimer = setTimeout(() => {
+    currentPage.value = 1
+    getFiles()
+  }, 300)
 }
 
 const handleSizeChange = (size) => {
   pageSize.value = size
+  currentPage.value = 1
   getFiles()
 }
 
@@ -226,9 +300,15 @@ const handleCurrentChange = (current) => {
 }
 
 const handleDownload = (row) => {
-  // 构建下载链接
+  // 创建隐藏的a标签来触发下载
   const downloadUrl = `/api/upload/download/${row.id}`
-  window.open(downloadUrl, '_blank')
+  const link = document.createElement('a')
+  link.href = downloadUrl
+  link.download = row.name || 'download'
+  link.target = '_blank'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
 const handleDelete = (id) => {
@@ -238,15 +318,10 @@ const handleDelete = (id) => {
     type: 'warning'
   }).then(() => {
     deleteFileApi(id).then(res => {
-      if (res.success) {
-        ElMessage.success('删除成功')
-        getFiles()
-      } else {
-        ElMessage.error('删除失败')
-      }
+      ElMessage.success('删除成功')
+      getFiles()
     }).catch(err => {
       console.error('删除文件错误:', err)
-      ElMessage.error('网络错误，请稍后重试')
     })
   }).catch(() => {
     // 取消删除
@@ -261,6 +336,32 @@ const getCategoryText = (category) => {
     'other': '其他'
   }
   return categoryMap[category] || '其他'
+}
+
+// 岗位映射
+const roleMap = {
+  1: '商铺开发',
+  2: '上门服务',
+  3: '品牌开发',
+  4: '商铺招商',
+  5: '品牌选址'
+}
+
+// 获取岗位文本
+const getRoleText = (role) => {
+  return roleMap[role] || '其他'
+}
+
+// 获取岗位标签类型
+const getRoleTagType = (role) => {
+  const typeMap = {
+    1: 'primary',    // 商铺开发 - 蓝色
+    2: 'success',    // 上门服务 - 绿色
+    3: 'warning',    // 品牌开发 - 橙色
+    4: 'danger',     // 商铺招商 - 红色
+    5: 'info'        // 品牌选址 - 灰色
+  }
+  return typeMap[role] || 'info'
 }
 
 const getFileTypeText = (fileType) => {

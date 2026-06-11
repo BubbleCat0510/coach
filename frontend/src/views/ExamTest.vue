@@ -161,7 +161,7 @@
     >
       <div class="result-content">
         <div class="score-circle">
-          <div class="score-number">{{ examResult.totalScore }}</div>
+          <div class="score-number">{{ examResult.totalScore.toFixed(1) }}</div>
           <div class="score-label">总分</div>
         </div>
         <div class="result-stats">
@@ -367,7 +367,8 @@ onUnmounted(() => {
 
 // 显示防作弊警告弹窗
 const showCheatWarningDialog = (message) => {
-  if (showCheatWarning.value) return // 如果弹窗已显示，不再重复弹出
+  // 如果弹窗已显示或已达到最大警告次数，不再处理
+  if (showCheatWarning.value || cheatWarningCount.value >= MAX_WARNING_COUNT) return
   
   cheatWarningCount.value++
   cheatWarningMessage.value = message
@@ -435,20 +436,21 @@ const autoSubmitExam = async () => {
       answer: answers.value[index] || ''
     }))
     
-    // 直接提交到结果表（后端计算分数和统计数据，不使用 coach_exam_session）
-    // 使用 keepalive 确保请求在页面关闭时仍能完成
+    const data = {
+      exam_date: examStartTime.value || new Date().toISOString().replace('T', ' ').substring(0, 19),
+      duration: duration,
+      exam_mode: 'comprehensive',
+      round_answers: roundAnswers
+    }
+    
+    // 使用 fetch keepalive 确保页面关闭时请求能完成
     await fetch('/api/exam/save_result', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       },
-      body: JSON.stringify({
-        exam_date: examStartTime.value || new Date().toISOString().replace('T', ' ').substring(0, 19),
-        duration: duration,
-        exam_mode: 'comprehensive',
-        round_answers: roundAnswers  // 直接传递答案，后端计算
-      }),
+      body: JSON.stringify(data),
       keepalive: true
     })
     
@@ -538,12 +540,21 @@ const selectOption = (optIndex) => {
   const current = answers.value[currentIndex.value] || ''
   
   if (currentQuestion.value.type === 'single') {
+    // 单选题：直接替换答案
     answers.value[currentIndex.value] = label
   } else {
-    if (current.includes(label)) {
-      answers.value[currentIndex.value] = current.replace(label, '')
+    // 多选题：添加或移除选项
+    const selectedOptions = current.split('')
+    const optionIndex = selectedOptions.indexOf(label)
+    
+    if (optionIndex !== -1) {
+      // 已选中，取消选择
+      selectedOptions.splice(optionIndex, 1)
+      answers.value[currentIndex.value] = selectedOptions.sort().join('')
     } else {
-      answers.value[currentIndex.value] = (current + label).split('').sort().join('')
+      // 未选中，添加选项并排序
+      selectedOptions.push(label)
+      answers.value[currentIndex.value] = selectedOptions.sort().join('')
     }
   }
 }
@@ -587,14 +598,14 @@ const confirmSubmit = async () => {
   // 计算考试用时（秒）- 使用真实耗时
   const duration = Math.floor((Date.now() - startTimestamp.value) / 1000)
   
+  // 构建答案列表（直接传递给 save_result）
+  const roundAnswers = questions.value.map((q, index) => ({
+    round_no: index + 1,
+    question_id: q.id,
+    answer: answers.value[index] || ''
+  }))
+  
   try {
-    // 构建答案列表（直接传递给 save_result）
-    const roundAnswers = questions.value.map((q, index) => ({
-      round_no: index + 1,
-      question_id: q.id,
-      answer: answers.value[index] || ''
-    }))
-    
     // 直接提交到结果表（后端计算分数和统计数据，不使用 coach_exam_session）
     const saveRes = await saveExamResult({
       exam_date: examStartTime.value || new Date().toISOString().replace('T', ' ').substring(0, 19),
@@ -603,22 +614,20 @@ const confirmSubmit = async () => {
       round_answers: roundAnswers  // 直接传递答案，后端计算
     })
     
-    if (saveRes.success) {
-      // 使用后端计算的统计数据
-      examResult.value.correctCount = saveRes.correct_count || 0
-      examResult.value.wrongCount = saveRes.wrong_count || 0
-      examResult.value.unansweredCount = saveRes.unanswered_count || 0
-      examResult.value.accuracy = saveRes.accuracy || 0
-      examResult.value.totalScore = saveRes.total_score || 0
-      console.log('考试结果保存成功:', saveRes)
-    }
+    // 使用后端计算的统计数据
+    examResult.value.correctCount = saveRes.correct_count || 0
+    examResult.value.wrongCount = saveRes.wrong_count || 0
+    examResult.value.unansweredCount = saveRes.unanswered_count || 0
+    examResult.value.accuracy = saveRes.accuracy || 0
+    examResult.value.totalScore = saveRes.total_score || 0
+    console.log('考试结果保存成功:', saveRes)
   } catch (error) {
-    console.error('保存结果失败:', error)
-    ElMessage.error('提交失败，请重试')
+    console.error('保存结果失败，使用前端计算:', error)
     // 降级使用前端计算（仅在后端失败时使用）
     calculateScore()
   }
   
+  // 显示结果弹窗
   showResultDialog.value = true
 }
 
@@ -628,6 +637,13 @@ const calculateScore = () => {
   let wrongCount = 0
   let unansweredCount = 0
 
+  // 使用整数分值（乘以100）避免浮点精度问题
+  const scoreMap = {
+    multiple: 278,  // 2.78 * 100
+    judge: 130,     // 1.30 * 100
+    single: 186     // 1.86 * 100
+  }
+
   questions.value.forEach((q, index) => {
     const userAnswer = answers.value[index]
     if (!userAnswer) {
@@ -635,20 +651,31 @@ const calculateScore = () => {
     } else {
       // 多选题答案排序后比较
       const userAns = userAnswer.toUpperCase().trim()
-      const correctAns = q.answer.toUpperCase().trim()
+      const correctAns = q.answer ? q.answer.toUpperCase().trim() : ''
+      
+      // 防御性检查：如果正确答案为空，跳过此题
+      if (!correctAns) {
+        unansweredCount++
+        return
+      }
+      
       const userSorted = userAns ? userAns.split('').sort().join('') : ''
-      const correctSorted = correctAns ? correctAns.split('').sort().join('') : ''
+      const correctSorted = correctAns.split('').sort().join('')
       
       if (userSorted === correctSorted) {
         // 根据题目类型确定分值
-        const questionScore = q.type === 'multiple' ? 8 : 3
-        totalScore += questionScore
+        totalScore += scoreMap[q.type] || scoreMap.single
         correctCount++
       } else {
         wrongCount++
       }
     }
   })
+
+  // 转换为小数并限制范围（0-100，保留一位小数）
+  totalScore = totalScore / 100
+  totalScore = Math.round(totalScore * 10) / 10
+  totalScore = Math.max(0, Math.min(100, totalScore))
 
   examResult.value = {
     totalScore,

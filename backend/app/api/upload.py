@@ -12,11 +12,27 @@ router = APIRouter(prefix="/upload", tags=["upload"])
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# 岗位到表名的映射
+ROLE_TABLE_MAP = {
+    1: "coach_file_upload_shop_development",    # 商铺开发
+    2: "coach_file_upload_door_service",         # 上门服务
+    3: "coach_file_upload_brand_development",    # 品牌开发
+    4: "coach_file_upload_shop_investment",      # 商铺招商
+    5: "coach_file_upload_brand_location"        # 品牌选址
+}
+
 @router.post("/file")
-def upload_file(file: UploadFile = File(...), category: str = Body("other"), current_user: dict = Depends(get_current_user)):
+def upload_file(file: UploadFile = File(...), category: str = Body("other"), role: int = Body(1), current_user: dict = Depends(get_current_user)):
     try:
-        # 文件大小限制：100MB
-        MAX_FILE_SIZE = 100 * 1024 * 1024
+        # 文件大小限制：500MB
+        MAX_FILE_SIZE = 500 * 1024 * 1024
+        
+        # 验证岗位参数
+        if role not in [1, 2, 3, 4, 5]:
+            return {
+                "success": False,
+                "message": "无效的岗位选择"
+            }
         
         # 生成唯一的文件名
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -34,7 +50,7 @@ def upload_file(file: UploadFile = File(...), category: str = Body("other"), cur
                     os.remove(file_path)
                 return {
                     "success": False,
-                    "message": "文件大小不能超过100MB"
+                    "message": "文件大小不能超过500MB"
                 }
                 
             f.write(content)
@@ -42,13 +58,16 @@ def upload_file(file: UploadFile = File(...), category: str = Body("other"), cur
         # 计算文件哈希值
         file_hash = hashlib.md5(content).hexdigest()
 
+        # 根据岗位选择对应的表
+        table_name = ROLE_TABLE_MAP[role]
+        
         # 保存到数据库
         user_id = current_user.get("user_id")
         with get_db() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    """
-                    INSERT INTO coach_file_upload (user_id, file_name, file_path, file_size, file_type, category, file_hash)
+                    f"""
+                    INSERT INTO {table_name} (user_id, file_name, file_path, file_size, file_type, category, file_hash)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """,
                     (user_id, file.filename, file_path, len(content), file.content_type, category, file_hash)
@@ -68,73 +87,91 @@ def upload_file(file: UploadFile = File(...), category: str = Body("other"), cur
         }
 
 @router.get("/list")
-def get_file_list(page: int = 1, pageSize: int = 10, search: str = "", current_user: dict = Depends(get_current_user)):
+def get_file_list(page: int = 1, pageSize: int = 10, search: str = "", role: int = None, current_user: dict = Depends(get_current_user)):
     try:
         with get_db() as conn:
             with conn.cursor() as cursor:
-                # 构建查询条件
-                where_clause = ""
-                params = []
+                # 从所有5个岗位表中查询文件
+                all_files = []
+                
+                # 如果指定了角色，只查询该角色对应的表
+                if role and role in ROLE_TABLE_MAP:
+                    tables_to_query = [(role, ROLE_TABLE_MAP[role])]
+                else:
+                    # 查询所有岗位表
+                    tables_to_query = ROLE_TABLE_MAP.items()
+                
+                for role_val, table_name in tables_to_query:
+                    # 构建查询条件
+                    where_clause = ""
+                    params = []
 
-                if search:
-                    where_clause = "WHERE coach_user.username LIKE %s"
-                    params.append(f"%{search}%")
+                    if search:
+                        where_clause = "WHERE file_name LIKE %s"
+                        params.append(f"%{search}%")
 
-                # 查询总记录数
-                cursor.execute(
-                    f"""
-                    SELECT COUNT(*) as total
-                    FROM coach_file_upload
-                    LEFT JOIN coach_user ON coach_file_upload.user_id = coach_user.id
-                    {where_clause}
-                    """,
-                    params
-                )
-                total_result = cursor.fetchone()
-                total = total_result["total"] if total_result else 0
+                    # 查询该岗位的所有文件
+                    query = f"""
+                        SELECT
+                            id,
+                            user_id,
+                            file_name as name,
+                            file_path,
+                            file_size as size,
+                            file_type as type,
+                            category,
+                            create_time as uploadTime,
+                            {role_val} as role
+                        FROM {table_name}
+                        {where_clause}
+                        ORDER BY create_time DESC
+                    """
+                    
+                    cursor.execute(query, params)
+                    files = cursor.fetchall()
+                    
+                    # 添加岗位标识
+                    for file in files:
+                        all_files.append(file)
 
-                # 计算偏移量
+                # 按创建时间排序（最新的在前）
+                all_files.sort(key=lambda x: x["uploadTime"], reverse=True)
+                
+                # 查询用户名
+                user_ids = list(set([f["user_id"] for f in all_files]))
+                user_map = {}
+                if user_ids:
+                    placeholders = ",".join(["%s"] * len(user_ids))
+                    cursor.execute(
+                        f"SELECT id, username FROM coach_user WHERE id IN ({placeholders})",
+                        user_ids
+                    )
+                    users = cursor.fetchall()
+                    user_map = {u["id"]: u["username"] for u in users}
+
+                # 计算总记录数
+                total = len(all_files)
+
+                # 计算分页
                 offset = (page - 1) * pageSize
+                paginated_files = all_files[offset:offset + pageSize]
 
-                # 查询分页数据
-                query_params = params + [pageSize, offset]
-                cursor.execute(
-                    f"""
-                    SELECT
-                        coach_file_upload.id,
-                        coach_file_upload.user_id,
-                        coach_user.username,
-                        coach_file_upload.file_name as name,
-                        coach_file_upload.file_path,
-                        coach_file_upload.file_size as size,
-                        coach_file_upload.file_type as type,
-                        coach_file_upload.category,
-                        coach_file_upload.create_time as uploadTime
-                    FROM coach_file_upload
-                    LEFT JOIN coach_user ON coach_file_upload.user_id = coach_user.id
-                    {where_clause}
-                    ORDER BY coach_file_upload.create_time DESC
-                    LIMIT %s OFFSET %s
-                    """,
-                    query_params
-                )
-                files = cursor.fetchall()
-
-        # 转换为字典列表
-        file_list = []
-        for file in files:
-            file_dict = {
-                "id": file["id"],
-                "userId": file["user_id"],
-                "username": file["username"],
-                "name": file["name"],
-                "path": file["file_path"],
-                "size": file["size"],
-                "type": file["type"],
-                "category": file["category"],
-                "uploadTime": file["uploadTime"].strftime("%Y-%m-%d %H:%M:%S") if file["uploadTime"] else None
-            }
-            file_list.append(file_dict)
+                # 转换为字典列表
+                file_list = []
+                for file in paginated_files:
+                    file_dict = {
+                        "id": file["id"],
+                        "userId": file["user_id"],
+                        "username": user_map.get(file["user_id"], ""),
+                        "name": file["name"],
+                        "path": file["file_path"],
+                        "size": file["size"],
+                        "type": file["type"],
+                        "category": file["category"],
+                        "role": file["role"],
+                        "uploadTime": file["uploadTime"].strftime("%Y-%m-%d %H:%M:%S") if file["uploadTime"] else None
+                    }
+                    file_list.append(file_dict)
 
         return {
             "success": True,
@@ -150,16 +187,20 @@ def get_file_list(page: int = 1, pageSize: int = 10, search: str = "", current_u
 @router.get("/download/{file_id}")
 def download_file(file_id: int):
     try:
-        # 从数据库中获取文件信息
+        # 从所有5个岗位表中查找文件
         with get_db() as conn:
             with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT file_path, file_name FROM coach_file_upload WHERE id = %s
-                    """,
-                    (file_id,)
-                )
-                file = cursor.fetchone()
+                file = None
+                for table_name in ROLE_TABLE_MAP.values():
+                    cursor.execute(
+                        f"""
+                        SELECT file_path, file_name FROM {table_name} WHERE id = %s
+                        """,
+                        (file_id,)
+                    )
+                    file = cursor.fetchone()
+                    if file:
+                        break
 
                 if not file:
                     return {
@@ -218,45 +259,22 @@ def download_file(file_id: int):
                     else:
                         media_type = 'application/octet-stream'
                 
-                # 为 PDF 和 Office 文件设置 Content-Disposition 为 inline，使其在浏览器中显示而不是下载
-                from fastapi.responses import FileResponse
+                # 使用FileResponse返回文件
                 import urllib.parse
                 
                 # 对文件名进行URL编码，处理非ASCII字符
                 encoded_filename = urllib.parse.quote(file_name)
                 
-                # 对于文本文件，直接返回文本内容
-                if extension in ['.txt', '.md', '.html', '.css', '.js', '.json', '.xml', '.csv', '.log']:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    return {
-                        "success": True,
-                        "content": content
-                    }
-                elif extension == '.pdf':
-                    return FileResponse(
-                        path=file_path,
-                        media_type=media_type,
-                        headers={
-                            'Content-Disposition': f'inline; filename*=UTF-8''{encoded_filename}'''
-                        }
-                    )
-                elif extension in ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']:
-                    return FileResponse(
-                        path=file_path,
-                        media_type=media_type,
-                        headers={
-                            'Content-Disposition': f'inline; filename*=UTF-8''{encoded_filename}'''
-                        }
-                    )
-                else:
-                    return FileResponse(
-                        path=file_path,
-                        media_type=media_type,
-                        headers={
-                            'Content-Disposition': f'attachment; filename*=UTF-8''{encoded_filename}'''
-                        }
-                    )
+                # 设置Content-Disposition为attachment，强制下载
+                headers = {
+                    'Content-Disposition': f'attachment; filename="{encoded_filename}"; filename*=UTF-8''\'{encoded_filename}\''
+                }
+                
+                return FileResponse(
+                    path=file_path,
+                    media_type=media_type,
+                    headers=headers
+                )
     except Exception as e:
         return {
             "success": False,
@@ -264,29 +282,32 @@ def download_file(file_id: int):
         }
 
 @router.post("/delete")
-def delete_file(file_id: int = Body(..., embed=True), current_user: dict = Depends(get_current_user)):
+def delete_file(id: int = Body(..., embed=True), current_user: dict = Depends(get_current_user)):
     try:
-        print(f"删除文件请求，file_id: {file_id}")
-        # 验证 file_id 是否为正整数
-        if not isinstance(file_id, int) or file_id <= 0:
-            print(f"无效的 file_id: {file_id}")
+        # 验证 id 是否为正整数
+        if not isinstance(id, int) or id <= 0:
             return {
                 "success": False,
                 "message": "无效的文件 ID"
             }
 
-        # 从数据库中获取文件信息
+        # 从所有5个岗位表中查找文件
         with get_db() as conn:
             with conn.cursor() as cursor:
                 try:
-                    cursor.execute(
-                        """
-                        SELECT file_path FROM coach_file_upload WHERE id = %s
-                        """,
-                        (file_id,)
-                    )
-                    file = cursor.fetchone()
-                    print(f"查询结果: {file}")
+                    file = None
+                    found_table = None  # 记录找到文件的表名
+                    for table_name in ROLE_TABLE_MAP.values():
+                        cursor.execute(
+                            f"""
+                            SELECT file_path FROM {table_name} WHERE id = %s
+                            """,
+                            (id,)
+                        )
+                        file = cursor.fetchone()
+                        if file:
+                            found_table = table_name
+                            break
 
                     if not file:
                         return {
@@ -296,28 +317,23 @@ def delete_file(file_id: int = Body(..., embed=True), current_user: dict = Depen
 
                     # 删除文件
                     file_path = file['file_path']
-                    print(f"文件路径: {file_path}")
                     if os.path.exists(file_path):
                         try:
                             os.remove(file_path)
-                            print(f"文件已删除: {file_path}")
-                        except Exception as e:
-                            print(f"删除文件异常: {type(e).__name__}, {str(e)}")
+                        except Exception:
                             # 即使文件删除失败，也继续删除数据库记录
-                    else:
-                        print(f"文件不存在: {file_path}")
+                            pass
 
-                    # 从数据库中删除记录
-                    cursor.execute(
-                        """
-                        DELETE FROM coach_file_upload WHERE id = %s
-                        """,
-                        (file_id,)
-                    )
+                    # 只从找到文件的那个表中删除记录
+                    if found_table:
+                        cursor.execute(
+                            f"""
+                            DELETE FROM {found_table} WHERE id = %s
+                            """,
+                            (id,)
+                        )
                     conn.commit()
-                    print(f"数据库记录已删除，file_id: {file_id}")
                 except Exception as e:
-                    print(f"数据库操作异常: {type(e).__name__}, {str(e)}")
                     conn.rollback()
                     return {
                         "success": False,
@@ -329,7 +345,6 @@ def delete_file(file_id: int = Body(..., embed=True), current_user: dict = Depen
             "message": "文件删除成功"
         }
     except Exception as e:
-        print(f"删除文件异常: {type(e).__name__}, {str(e)}")
         return {
             "success": False,
             "message": f"文件删除失败: {str(e)}"
@@ -337,17 +352,10 @@ def delete_file(file_id: int = Body(..., embed=True), current_user: dict = Depen
 
 
 @router.post("/progress")
-def update_progress(file_id: int = Body(..., embed=True), progress: int = Body(..., embed=True), learning_time: int = Body(0, embed=True), current_user: dict = Depends(get_current_user)):
+def update_progress(id: int = Body(..., embed=True), progress: int = Body(..., embed=True), learningTime: int = Body(0, embed=True), role: int = Body(1, embed=True), current_user: dict = Depends(get_current_user)):
     """更新用户文件学习进度"""
     try:
         user_id = current_user.get("user_id")
-        
-        # 打印接收到的参数
-        print(f"=== 更新进度参数 ===")
-        print(f"user_id: {user_id}")
-        print(f"file_id: {file_id}")
-        print(f"progress: {progress}")
-        print(f"learning_time: {learning_time}")
         
         # 验证参数
         if progress < 0:
@@ -355,71 +363,70 @@ def update_progress(file_id: int = Body(..., embed=True), progress: int = Body(.
         elif progress > 100:
             progress = 100
         
+        # 验证岗位参数
+        if role not in [1, 2, 3, 4, 5]:
+            role = 1
+        
         is_completed = 1 if progress >= 100 else 0
         
         with get_db() as conn:
             with conn.cursor() as cursor:
-                # 检查是否已存在记录
+                # 检查是否已存在记录（包含岗位信息）
                 cursor.execute(
                     """
                     SELECT id, total_learning_time FROM coach_user_file_progress 
-                    WHERE user_id = %s AND file_id = %s
+                    WHERE user_id = %s AND file_id = %s AND role = %s
                     """,
-                    (user_id, file_id)
+                    (user_id, id, role)
                 )
                 existing = cursor.fetchone()
                 
-                print(f"existing record: {existing}")
-                
                 if existing:
                     # 更新进度和学习时间（直接使用前端传递的学习时间）
-                    total_time = learning_time
-                    print(f"更新记录 - total_time: {total_time}")
+                    total_time = learningTime
                     cursor.execute(
                         """
                         UPDATE coach_user_file_progress 
                         SET progress = %s, is_completed = %s, last_read_time = CURRENT_TIMESTAMP, total_learning_time = %s
-                        WHERE user_id = %s AND file_id = %s
+                        WHERE user_id = %s AND file_id = %s AND role = %s
                         """,
-                        (progress, is_completed, total_time, user_id, file_id)
+                        (progress, is_completed, total_time, user_id, id, role)
                     )
                 else:
                     # 插入新记录
-                    total_time = learning_time
-                    print(f"插入新记录 - learning_time: {learning_time}")
+                    total_time = learningTime
                     cursor.execute(
                         """
-                        INSERT INTO coach_user_file_progress (user_id, file_id, progress, is_completed, total_learning_time)
-                        VALUES (%s, %s, %s, %s, %s)
+                        INSERT INTO coach_user_file_progress (user_id, file_id, progress, is_completed, total_learning_time, role)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                         """,
-                        (user_id, file_id, progress, is_completed, total_time)
+                        (user_id, id, progress, is_completed, total_time, role)
                     )
                 conn.commit()
         
-        result = {
+        return {
             "success": True,
             "message": "进度更新成功",
             "progress": progress,
             "is_completed": is_completed,
-            "learning_time": total_time if existing else learning_time
+            "learningTime": total_time if existing else learningTime
         }
-        print(f"返回结果：{result}")
-        print(f"===================\n")
-        
-        return result
     except Exception as e:
-        print(f"异常：{str(e)}")
         return {
             "success": False,
             "message": f"进度更新失败: {str(e)}"
         }
 
 
-@router.get("/progress/{file_id}")
-def get_progress(file_id: int, current_user: dict = Depends(get_current_user)):
+@router.get("/progress/{id}")
+def get_progress(id: int, role: int = 1, current_user: dict = Depends(get_current_user)):
     """获取用户文件学习进度"""
     try:
         user_id = current_user.get("user_id")
+        
+        # 验证岗位参数
+        if role not in [1, 2, 3, 4, 5]:
+            role = 1
         
         with get_db() as conn:
             with conn.cursor() as cursor:
@@ -427,9 +434,9 @@ def get_progress(file_id: int, current_user: dict = Depends(get_current_user)):
                     """
                     SELECT progress, is_completed, last_read_time, total_learning_time 
                     FROM coach_user_file_progress 
-                    WHERE user_id = %s AND file_id = %s
+                    WHERE user_id = %s AND file_id = %s AND role = %s
                     """,
-                    (user_id, file_id)
+                    (user_id, id, role)
                 )
                 result = cursor.fetchone()
                 
@@ -437,17 +444,17 @@ def get_progress(file_id: int, current_user: dict = Depends(get_current_user)):
                     return {
                         "success": True,
                         "progress": result["progress"],
-                        "is_completed": result["is_completed"],
-                        "last_read_time": result["last_read_time"].strftime("%Y-%m-%d %H:%M:%S") if result["last_read_time"] else None,
-                        "learning_time": result["total_learning_time"]
+                        "isCompleted": result["is_completed"],
+                        "lastReadTime": result["last_read_time"].strftime("%Y-%m-%d %H:%M:%S") if result["last_read_time"] else None,
+                        "learningTime": result["total_learning_time"]
                     }
                 else:
                     return {
                         "success": True,
                         "progress": 0,
-                        "is_completed": 0,
-                        "last_read_time": None,
-                        "learning_time": 0
+                        "isCompleted": 0,
+                        "lastReadTime": None,
+                        "learningTime": 0
                     }
     except Exception as e:
         return {
@@ -462,12 +469,25 @@ def get_learning_status(page: int = 1, pageSize: int = 10, search: str = "", cur
     try:
         with get_db() as conn:
             with conn.cursor() as cursor:
+                # 构建联合查询所有岗位文件表（包含岗位信息）
+                union_files_query = """
+                    SELECT id, file_name, file_type, 1 as role FROM coach_file_upload_shop_development
+                    UNION ALL
+                    SELECT id, file_name, file_type, 2 as role FROM coach_file_upload_door_service
+                    UNION ALL
+                    SELECT id, file_name, file_type, 3 as role FROM coach_file_upload_brand_development
+                    UNION ALL
+                    SELECT id, file_name, file_type, 4 as role FROM coach_file_upload_shop_investment
+                    UNION ALL
+                    SELECT id, file_name, file_type, 5 as role FROM coach_file_upload_brand_location
+                """
+
                 # 构建查询条件
                 where_clause = ""
                 params = []
 
                 if search:
-                    where_clause = "WHERE coach_user.username LIKE %s OR coach_file_upload.file_name LIKE %s"
+                    where_clause = "WHERE coach_user.username LIKE %s OR files.file_name LIKE %s"
                     params.extend([f"%{search}%", f"%{search}%"])
 
                 # 查询总记录数
@@ -476,7 +496,7 @@ def get_learning_status(page: int = 1, pageSize: int = 10, search: str = "", cur
                     SELECT COUNT(*) as total
                     FROM coach_user_file_progress
                     LEFT JOIN coach_user ON coach_user_file_progress.user_id = coach_user.id
-                    LEFT JOIN coach_file_upload ON coach_user_file_progress.file_id = coach_file_upload.id
+                    LEFT JOIN ({union_files_query}) as files ON coach_user_file_progress.file_id = files.id AND coach_user_file_progress.role = files.role
                     {where_clause}
                     """,
                     params
@@ -496,16 +516,18 @@ def get_learning_status(page: int = 1, pageSize: int = 10, search: str = "", cur
                         coach_user.id as user_id,
                         coach_user.username,
                         coach_user.nickname,
-                        coach_file_upload.id as file_id,
-                        coach_file_upload.file_name as file_name,
-                        coach_file_upload.file_type as file_type,
+                        coach_user.role as user_role,
+                        files.id as file_id,
+                        files.file_name as file_name,
+                        files.file_type as file_type,
+                        coach_user_file_progress.role,
                         coach_user_file_progress.progress,
                         coach_user_file_progress.is_completed,
                         coach_user_file_progress.last_read_time,
                         coach_user_file_progress.total_learning_time
                     FROM coach_user_file_progress
                     LEFT JOIN coach_user ON coach_user_file_progress.user_id = coach_user.id
-                    LEFT JOIN coach_file_upload ON coach_user_file_progress.file_id = coach_file_upload.id
+                    LEFT JOIN ({union_files_query}) as files ON coach_user_file_progress.file_id = files.id AND coach_user_file_progress.role = files.role
                     {where_clause}
                     ORDER BY coach_user_file_progress.last_read_time DESC
                     LIMIT %s OFFSET %s
@@ -522,9 +544,11 @@ def get_learning_status(page: int = 1, pageSize: int = 10, search: str = "", cur
                 "userId": record["user_id"],
                 "username": record["username"],
                 "nickname": record["nickname"],
+                "userRole": record["user_role"],
                 "fileId": record["file_id"],
                 "fileName": record["file_name"],
                 "fileType": record["file_type"],
+                "role": record["role"],
                 "progress": record["progress"],
                 "isCompleted": record["is_completed"],
                 "lastReadTime": record["last_read_time"].strftime("%Y-%m-%d %H:%M:%S") if record["last_read_time"] else None,
@@ -549,20 +573,33 @@ def get_my_learning_records(current_user: dict = Depends(get_current_user)):
     try:
         user_id = current_user.get("user_id")
 
+        # 构建联合查询所有岗位文件表（包含岗位信息）
+        union_files_query = """
+            SELECT id, file_name, file_type, 1 as role FROM coach_file_upload_shop_development
+            UNION ALL
+            SELECT id, file_name, file_type, 2 as role FROM coach_file_upload_door_service
+            UNION ALL
+            SELECT id, file_name, file_type, 3 as role FROM coach_file_upload_brand_development
+            UNION ALL
+            SELECT id, file_name, file_type, 4 as role FROM coach_file_upload_shop_investment
+            UNION ALL
+            SELECT id, file_name, file_type, 5 as role FROM coach_file_upload_brand_location
+        """
+
         with get_db() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    """
+                    f"""
                     SELECT
                         coach_user_file_progress.id,
-                        coach_file_upload.file_name as file_name,
-                        coach_file_upload.file_type as file_type,
+                        files.file_name as file_name,
+                        files.file_type as file_type,
                         coach_user_file_progress.progress,
                         coach_user_file_progress.is_completed,
                         coach_user_file_progress.last_read_time,
                         coach_user_file_progress.total_learning_time
                     FROM coach_user_file_progress
-                    LEFT JOIN coach_file_upload ON coach_user_file_progress.file_id = coach_file_upload.id
+                    LEFT JOIN ({union_files_query}) as files ON coach_user_file_progress.file_id = files.id AND coach_user_file_progress.role = files.role
                     WHERE coach_user_file_progress.user_id = %s
                     ORDER BY coach_user_file_progress.last_read_time DESC
                     """,
@@ -573,15 +610,6 @@ def get_my_learning_records(current_user: dict = Depends(get_current_user)):
         # 转换为前端需要的格式
         record_list = []
         for record in records:
-            # 根据文件类型判断学习类型
-            file_type = record.get("file_type", "")
-            if file_type == "pdf":
-                learn_type = "学习"
-            elif file_type == "video":
-                learn_type = "训练"
-            else:
-                learn_type = "学习"
-
             # 格式化学习时长
             total_time = record.get("total_learning_time") or 0
             if total_time >= 60:

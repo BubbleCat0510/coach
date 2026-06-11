@@ -12,6 +12,8 @@
               clearable
               style="width: 300px;"
               @keyup.enter="handleSearch"
+              @input="handleSearch"
+              @clear="handleSearch"
             >
               <template #prefix>
                 <el-icon class="el-input__icon"><Search /></el-icon>
@@ -219,35 +221,44 @@ const editRules = reactive({
 const getUsers = async () => {
   try {
     loading.value = true
-    const response = await getUserList()
-    if (response && response.users) {
-      userList.value = response.users
-      total.value = response.users.length
-    } else {
-      ElMessage.error('获取用户列表失败')
-    }
+    const response = await getUserList({
+      search: searchQuery.value,
+      page: currentPage.value,
+      page_size: pageSize.value
+    })
+    userList.value = response.users || []
+    total.value = response.total || response.users?.length || 0
   } catch (error) {
     console.error('获取用户列表错误:', error)
-    ElMessage.error('网络错误，请稍后重试')
   } finally {
     loading.value = false
   }
 }
 
+// 防抖定时器
+let searchTimer = null
+
 const handleSearch = () => {
-  // 简单的前端搜索
-  // 实际项目中应该调用后端API进行搜索
-  currentPage.value = 1
-  getUsers()
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+  searchTimer = setTimeout(() => {
+    // 简单的前端搜索
+    // 实际项目中应该调用后端API进行搜索
+    currentPage.value = 1
+    getUsers()
+  }, 300)
 }
 
 const handleSizeChange = (size) => {
   pageSize.value = size
   currentPage.value = 1
+  getUsers()
 }
 
 const handleCurrentChange = (current) => {
   currentPage.value = current
+  getUsers()
 }
 
 const handleAdd = () => {

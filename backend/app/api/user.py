@@ -79,17 +79,34 @@ def get_user_role(current_user: dict = Depends(get_current_user)):
 
 # 获取用户列表（管理员权限）
 @router.get("/list")
-def get_user_list(current_user: dict = Depends(get_current_user)):
-    # 从数据库查询所有用户
+def get_user_list(search: str = "", page: int = 1, page_size: int = 10, current_user: dict = Depends(get_current_user)):
+    # 构建查询条件
+    where_clause = ""
+    params = []
+    
+    if search:
+        where_clause = "WHERE username LIKE %s OR nickname LIKE %s"
+        params.extend([f"%{search}%", f"%{search}%"])
+    
+    # 计算分页偏移量
+    offset = (page - 1) * page_size
+    
     with get_db() as conn:
         with conn.cursor() as cursor:
-            cursor.execute(
-                """
+            # 查询总条数
+            count_sql = f"SELECT COUNT(*) as total FROM coach_user {where_clause}"
+            cursor.execute(count_sql, params)
+            total = cursor.fetchone()["total"]
+            
+            # 查询用户列表
+            sql = f"""
                 SELECT id, username, nickname as name, role, create_time as createdAt 
                 FROM coach_user
+                {where_clause}
                 ORDER BY id ASC
-                """
-            )
+                LIMIT %s OFFSET %s
+            """
+            cursor.execute(sql, params + [page_size, offset])
             users = cursor.fetchall()
     
     # 转换为前端需要的格式
@@ -103,7 +120,7 @@ def get_user_list(current_user: dict = Depends(get_current_user)):
             "createdAt": user["createdAt"].strftime("%Y-%m-%d %H:%M:%S") if user["createdAt"] else ""
         })
     
-    return {"users": user_list}
+    return {"users": user_list, "total": total}
 
 # 更新用户角色
 @router.post("/update-role")

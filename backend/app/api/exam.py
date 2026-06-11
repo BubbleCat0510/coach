@@ -13,7 +13,7 @@ def get_random_questions(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    从题库中随机获取题目：单选题10题、判断题10题、多选题5题
+    从题库中随机获取题目：单选题22题、判断题22题、多选题11题（共55题）
     题目范围：通用题目 + 对应用户角色的题目
     """
     user_id = current_user.get("user_id")
@@ -34,30 +34,30 @@ def get_random_questions(
             if role and role != 0:
                 category_condition = f"(category = 0 OR category = {role})"
             
-            # 获取单选题（10题）
+            # 获取单选题（22题）- 占总题数的2/5
             cursor.execute(f"""
                 SELECT id, question, answer, type, options, difficulty, category 
                 FROM coach_question_bank 
                 WHERE status = 1 AND type = 'single' AND {category_condition}
-                ORDER BY RAND() LIMIT 10
+                ORDER BY RAND() LIMIT 22
             """)
             single_questions = cursor.fetchall()
             
-            # 获取判断题（10题）
+            # 获取判断题（22题）- 占总题数的2/5
             cursor.execute(f"""
                 SELECT id, question, answer, type, options, difficulty, category 
                 FROM coach_question_bank 
                 WHERE status = 1 AND type = 'judge' AND {category_condition}
-                ORDER BY RAND() LIMIT 10
+                ORDER BY RAND() LIMIT 22
             """)
             judge_questions = cursor.fetchall()
             
-            # 获取多选题（5题）
+            # 获取多选题（11题）- 占总题数的1/5
             cursor.execute(f"""
                 SELECT id, question, answer, type, options, difficulty, category 
                 FROM coach_question_bank 
                 WHERE status = 1 AND type = 'multiple' AND {category_condition}
-                ORDER BY RAND() LIMIT 5
+                ORDER BY RAND() LIMIT 11
             """)
             multiple_questions = cursor.fetchall()
             
@@ -212,11 +212,14 @@ def submit_answer(
                     if question:
                         correct_answer = question["answer"]
                         question_type = question["type"]
-                        # 根据题目类型确定分值
-                        if question_type == 'multiple':
-                            question_score = 8  # 多选题8分
-                        else:
-                            question_score = 3  # 单选和判断题3分
+                        # 使用整数分值（乘以100）避免浮点精度问题
+                        # 单选题：1.86分，判断题：1.30分，多选题：2.78分
+                        score_map = {
+                            'multiple': 278,  # 2.78 * 100
+                            'judge': 130,     # 1.30 * 100
+                            'single': 186     # 1.86 * 100
+                        }
+                        question_score = score_map.get(question_type, score_map['single'])
                         
                         # 比对答案（多选题需要排序后比较）
                         user_ans = str(user_answer or "").strip().upper()
@@ -298,7 +301,12 @@ def submit_answer(
                         scenario
                     ))
 
-                total_score += round_score  # 累加所有单题得分，得到总分
+                total_score += round_score  # 累加所有单题得分（整数形式）
+            
+            # 转换为小数并限制范围（0-100，保留一位小数）
+            total_score = total_score / 100
+            total_score = round(total_score * 10) / 10
+            total_score = max(0, min(100, total_score))
             
             # 更新会话表的总分 + 结束状态
             cursor.execute("""
@@ -396,11 +404,14 @@ def save_exam_result(
                         correct_answer = question["answer"]
                         question_type = question["type"]
                         
-                        # 根据题目类型确定分值
-                        if question_type == 'multiple':
-                            question_score = 8
-                        else:
-                            question_score = 3
+                        # 使用整数分值（乘以100）避免浮点精度问题
+                        # 单选题：1.86分，判断题：1.30分，多选题：2.78分
+                        score_map = {
+                            'multiple': 278,  # 2.78 * 100
+                            'judge': 130,     # 1.30 * 100
+                            'single': 186     # 1.86 * 100
+                        }
+                        question_score = score_map.get(question_type, score_map['single'])
                         
                         # 比对答案（多选题排序后比较）
                         user_ans = str(user_answer).strip().upper()
@@ -423,6 +434,10 @@ def save_exam_result(
                     correct_count += 1
                 else:
                     wrong_count += 1
+            
+            # 限制总分在0-100范围内，保留一位小数
+            total_score = round(total_score * 10) / 10
+            total_score = max(0, min(100, total_score))
             
             # 计算正确率
             answered_count = correct_count + wrong_count
